@@ -14,6 +14,7 @@ include_directories(
     src/models
     src/canvas
     src/ui
+    src/utils
 )
 
 add_executable(book-creator-native
@@ -26,8 +27,12 @@ add_executable(book-creator-native
     src/canvas/book_canvas_view.cpp
     src/ui/drawing_toolbox_dock.h
     src/ui/drawing_toolbox_dock.cpp
+    src/ui/layers_dock.h
+    src/ui/layers_dock.cpp
     src/ui/main_window.h
     src/ui/main_window.cpp
+    src/utils/pdf_exporter.h
+    src/utils/pdf_exporter.cpp
 )
 
 target_link_libraries(book-creator-native PRIVATE

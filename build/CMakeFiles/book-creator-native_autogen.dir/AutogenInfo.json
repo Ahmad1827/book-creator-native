@@ -205,9 +205,21 @@
 			null
 		],
 		[
+			"/home/ahmad/proiecte/book-creator-native/src/ui/layers_dock.h",
+			"MU",
+			"YPKJ5OE7LN/moc_layers_dock.cpp",
+			null
+		],
+		[
 			"/home/ahmad/proiecte/book-creator-native/src/ui/main_window.h",
 			"MU",
 			"YPKJ5OE7LN/moc_main_window.cpp",
+			null
+		],
+		[
+			"/home/ahmad/proiecte/book-creator-native/src/utils/pdf_exporter.h",
+			"MU",
+			"VSCBVMNR7M/moc_pdf_exporter.cpp",
 			null
 		]
 	],
@@ -235,6 +247,7 @@
 		"/home/ahmad/proiecte/book-creator-native/src/models",
 		"/home/ahmad/proiecte/book-creator-native/src/canvas",
 		"/home/ahmad/proiecte/book-creator-native/src/ui",
+		"/home/ahmad/proiecte/book-creator-native/src/utils",
 		"/usr/include/x86_64-linux-gnu/qt6/QtCore",
 		"/usr/include/x86_64-linux-gnu/qt6",
 		"/usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++",
@@ -298,7 +311,17 @@
 			null
 		],
 		[
+			"/home/ahmad/proiecte/book-creator-native/src/ui/layers_dock.cpp",
+			"MU",
+			null
+		],
+		[
 			"/home/ahmad/proiecte/book-creator-native/src/ui/main_window.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/ahmad/proiecte/book-creator-native/src/utils/pdf_exporter.cpp",
 			"MU",
 			null
 		]
