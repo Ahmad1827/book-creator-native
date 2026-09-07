@@ -18,8 +18,8 @@ BookCanvasView::BookCanvasView(QWidget *parent)
     setRenderHint(QPainter::SmoothPixmapTransform, true);
     setOptimizationFlag(QGraphicsView::DontAdjustForAntialiasing, false);
 
-    setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
-    setResizeAnchor(QGraphicsView::AnchorUnderMouse);
+    setTransformationAnchor(QGraphicsView::NoAnchor);
+    setResizeAnchor(QGraphicsView::NoAnchor);
     setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setFrameShape(QFrame::NoFrame);
@@ -193,18 +193,22 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 }
 
 void BookCanvasView::wheelEvent(QWheelEvent *event) {
+    if (event->angleDelta().y() == 0) return;
+
     const qreal factor = (event->angleDelta().y() > 0) ? 1.12 : (1.0 / 1.12);
 
-    // Pin the point under the mouse cursor in scene coordinates
-    QPoint mousePos = event->position().toPoint();
-    QPointF targetScenePos = mapToScene(mousePos);
+    QPointF mouseViewportPos = event->position();
+    QPointF anchorScenePos = mapToScene(mouseViewportPos.toPoint());
 
     scale(factor, factor);
 
-    // Shift view center so targetScenePos stays anchored under mousePos
-    QPointF delta = targetScenePos - mapToScene(mousePos);
-    centerOn(mapToScene(viewport()->rect().center()) + delta);
+    QPointF viewportCenter = viewport()->rect().center();
+    QPointF offsetFromCursor = viewportCenter - mouseViewportPos;
 
+    qreal currentZoom = transform().m11();
+    QPointF newSceneCenter = anchorScenePos + (offsetFromCursor / currentZoom);
+
+    centerOn(newSceneCenter);
     event->accept();
 }
 
