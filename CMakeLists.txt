@@ -29,6 +29,10 @@ add_executable(book-creator-native
     src/ui/drawing_toolbox_dock.cpp
     src/ui/layers_dock.h
     src/ui/layers_dock.cpp
+    src/ui/new_book_dialog.h
+    src/ui/new_book_dialog.cpp
+    src/ui/bookshelf_view.h
+    src/ui/bookshelf_view.cpp
     src/ui/main_window.h
     src/ui/main_window.cpp
     src/utils/pdf_exporter.h

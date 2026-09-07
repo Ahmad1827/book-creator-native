@@ -92,6 +92,22 @@ build CMakeFiles/book-creator-native.dir/src/ui/layers_dock.cpp.o: CXX_COMPILER_
   OBJECT_DIR = CMakeFiles/book-creator-native.dir
   OBJECT_FILE_DIR = CMakeFiles/book-creator-native.dir/src/ui
 
+build CMakeFiles/book-creator-native.dir/src/ui/new_book_dialog.cpp.o: CXX_COMPILER__book-creator-native_unscanned_ /home/ahmad/proiecte/book-creator-native/src/ui/new_book_dialog.cpp || cmake_object_order_depends_target_book-creator-native
+  DEFINES = -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_SVG_LIB -DQT_WIDGETS_LIB
+  DEP_FILE = CMakeFiles/book-creator-native.dir/src/ui/new_book_dialog.cpp.o.d
+  FLAGS = -std=gnu++20 -fPIC
+  INCLUDES = -I/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/include -I/home/ahmad/proiecte/book-creator-native/src -I/home/ahmad/proiecte/book-creator-native/src/models -I/home/ahmad/proiecte/book-creator-native/src/canvas -I/home/ahmad/proiecte/book-creator-native/src/ui -I/home/ahmad/proiecte/book-creator-native/src/utils -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtGui -isystem /usr/include/x86_64-linux-gnu/qt6/QtWidgets -isystem /usr/include/x86_64-linux-gnu/qt6/QtSvg
+  OBJECT_DIR = CMakeFiles/book-creator-native.dir
+  OBJECT_FILE_DIR = CMakeFiles/book-creator-native.dir/src/ui
+
+build CMakeFiles/book-creator-native.dir/src/ui/bookshelf_view.cpp.o: CXX_COMPILER__book-creator-native_unscanned_ /home/ahmad/proiecte/book-creator-native/src/ui/bookshelf_view.cpp || cmake_object_order_depends_target_book-creator-native
+  DEFINES = -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_SVG_LIB -DQT_WIDGETS_LIB
+  DEP_FILE = CMakeFiles/book-creator-native.dir/src/ui/bookshelf_view.cpp.o.d
+  FLAGS = -std=gnu++20 -fPIC
+  INCLUDES = -I/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/include -I/home/ahmad/proiecte/book-creator-native/src -I/home/ahmad/proiecte/book-creator-native/src/models -I/home/ahmad/proiecte/book-creator-native/src/canvas -I/home/ahmad/proiecte/book-creator-native/src/ui -I/home/ahmad/proiecte/book-creator-native/src/utils -isystem /usr/include/x86_64-linux-gnu/qt6/QtCore -isystem /usr/include/x86_64-linux-gnu/qt6 -isystem /usr/lib/x86_64-linux-gnu/qt6/mkspecs/linux-g++ -isystem /usr/include/x86_64-linux-gnu/qt6/QtGui -isystem /usr/include/x86_64-linux-gnu/qt6/QtWidgets -isystem /usr/include/x86_64-linux-gnu/qt6/QtSvg
+  OBJECT_DIR = CMakeFiles/book-creator-native.dir
+  OBJECT_FILE_DIR = CMakeFiles/book-creator-native.dir/src/ui
+
 build CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o: CXX_COMPILER__book-creator-native_unscanned_ /home/ahmad/proiecte/book-creator-native/src/ui/main_window.cpp || cmake_object_order_depends_target_book-creator-native
   DEFINES = -DQT_CORE_LIB -DQT_GUI_LIB -DQT_NO_DEBUG -DQT_SVG_LIB -DQT_WIDGETS_LIB
   DEP_FILE = CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o.d
@@ -116,7 +132,7 @@ build CMakeFiles/book-creator-native.dir/src/utils/pdf_exporter.cpp.o: CXX_COMPI
 #############################################
 # Link the executable book-creator-native
 
-build book-creator-native: CXX_EXECUTABLE_LINKER__book-creator-native_ CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o CMakeFiles/book-creator-native.dir/src/main.cpp.o CMakeFiles/book-creator-native.dir/src/canvas/theme_decors.cpp.o CMakeFiles/book-creator-native.dir/src/canvas/book_canvas_view.cpp.o CMakeFiles/book-creator-native.dir/src/ui/drawing_toolbox_dock.cpp.o CMakeFiles/book-creator-native.dir/src/ui/layers_dock.cpp.o CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o CMakeFiles/book-creator-native.dir/src/utils/pdf_exporter.cpp.o | /usr/lib/x86_64-linux-gnu/libQt6Widgets.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Svg.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Gui.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 /usr/lib/x86_64-linux-gnu/libGLX.so /usr/lib/x86_64-linux-gnu/libOpenGL.so || book-creator-native_autogen book-creator-native_autogen_timestamp_deps
+build book-creator-native: CXX_EXECUTABLE_LINKER__book-creator-native_ CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o CMakeFiles/book-creator-native.dir/src/main.cpp.o CMakeFiles/book-creator-native.dir/src/canvas/theme_decors.cpp.o CMakeFiles/book-creator-native.dir/src/canvas/book_canvas_view.cpp.o CMakeFiles/book-creator-native.dir/src/ui/drawing_toolbox_dock.cpp.o CMakeFiles/book-creator-native.dir/src/ui/layers_dock.cpp.o CMakeFiles/book-creator-native.dir/src/ui/new_book_dialog.cpp.o CMakeFiles/book-creator-native.dir/src/ui/bookshelf_view.cpp.o CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o CMakeFiles/book-creator-native.dir/src/utils/pdf_exporter.cpp.o | /usr/lib/x86_64-linux-gnu/libQt6Widgets.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Svg.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Gui.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 /usr/lib/x86_64-linux-gnu/libGLX.so /usr/lib/x86_64-linux-gnu/libOpenGL.so || book-creator-native_autogen book-creator-native_autogen_timestamp_deps
   LINK_LIBRARIES = /usr/lib/x86_64-linux-gnu/libQt6Widgets.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Svg.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Gui.so.6.4.2  /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2  /usr/lib/x86_64-linux-gnu/libGLX.so  /usr/lib/x86_64-linux-gnu/libOpenGL.so
   OBJECT_DIR = CMakeFiles/book-creator-native.dir
   POST_BUILD = :
@@ -173,7 +189,7 @@ build book-creator-native_autogen/timestamp book-creator-native_autogen/mocs_com
 #############################################
 # Phony custom command for CMakeFiles/book-creator-native_autogen_timestamp_deps
 
-build CMakeFiles/book-creator-native_autogen_timestamp_deps | ${cmake_ninja_workdir}CMakeFiles/book-creator-native_autogen_timestamp_deps: phony /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Gui.so.6.4.2 /usr/lib/qt6/libexec/moc /usr/lib/x86_64-linux-gnu/libQt6Widgets.so.6.4.2 /usr/lib/qt6/libexec/uic /usr/lib/x86_64-linux-gnu/libQt6Svg.so.6.4.2
+build CMakeFiles/book-creator-native_autogen_timestamp_deps | ${cmake_ninja_workdir}CMakeFiles/book-creator-native_autogen_timestamp_deps: phony /usr/lib/x86_64-linux-gnu/libQt6Core.so.6.4.2 /usr/lib/qt6/libexec/moc /usr/lib/x86_64-linux-gnu/libQt6Svg.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Widgets.so.6.4.2 /usr/lib/x86_64-linux-gnu/libQt6Gui.so.6.4.2 /usr/lib/qt6/libexec/uic
 
 
 #############################################

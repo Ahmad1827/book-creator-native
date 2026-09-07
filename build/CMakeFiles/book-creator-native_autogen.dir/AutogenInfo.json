@@ -199,6 +199,12 @@
 			null
 		],
 		[
+			"/home/ahmad/proiecte/book-creator-native/src/ui/bookshelf_view.h",
+			"MU",
+			"YPKJ5OE7LN/moc_bookshelf_view.cpp",
+			null
+		],
+		[
 			"/home/ahmad/proiecte/book-creator-native/src/ui/drawing_toolbox_dock.h",
 			"MU",
 			"YPKJ5OE7LN/moc_drawing_toolbox_dock.cpp",
@@ -214,6 +220,12 @@
 			"/home/ahmad/proiecte/book-creator-native/src/ui/main_window.h",
 			"MU",
 			"YPKJ5OE7LN/moc_main_window.cpp",
+			null
+		],
+		[
+			"/home/ahmad/proiecte/book-creator-native/src/ui/new_book_dialog.h",
+			"MU",
+			"YPKJ5OE7LN/moc_new_book_dialog.cpp",
 			null
 		],
 		[
@@ -306,6 +318,11 @@
 		],
 		[ "/home/ahmad/proiecte/book-creator-native/src/main.cpp", "MU", null ],
 		[
+			"/home/ahmad/proiecte/book-creator-native/src/ui/bookshelf_view.cpp",
+			"MU",
+			null
+		],
+		[
 			"/home/ahmad/proiecte/book-creator-native/src/ui/drawing_toolbox_dock.cpp",
 			"MU",
 			null
@@ -317,6 +334,11 @@
 		],
 		[
 			"/home/ahmad/proiecte/book-creator-native/src/ui/main_window.cpp",
+			"MU",
+			null
+		],
+		[
+			"/home/ahmad/proiecte/book-creator-native/src/ui/new_book_dialog.cpp",
 			"MU",
 			null
 		],
