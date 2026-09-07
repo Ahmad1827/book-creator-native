@@ -23,6 +23,13 @@ BookCanvasView::BookCanvasView(QWidget *parent)
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setFrameShape(QFrame::NoFrame);
 
+    m_rasterLayer = QImage(1200, 650, QImage::Format_ARGB32_Premultiplied);
+    m_rasterLayer.fill(Qt::transparent);
+
+    m_rasterPixmapItem = m_scene->addPixmap(QPixmap::fromImage(m_rasterLayer));
+    m_rasterPixmapItem->setZValue(100);
+    m_rasterPixmapItem->setAcceptedMouseButtons(Qt::NoButton);
+
     setMode(CanvasMode::Draw);
 }
 
@@ -54,15 +61,19 @@ void BookCanvasView::setMode(CanvasMode mode) {
         setDragMode(QGraphicsView::RubberBandDrag);
         setInteractive(true);
         for (auto *item : m_scene->items()) {
-            item->setFlag(QGraphicsItem::ItemIsSelectable, true);
-            item->setFlag(QGraphicsItem::ItemIsMovable, true);
+            if (item != m_rasterPixmapItem) {
+                item->setFlag(QGraphicsItem::ItemIsSelectable, true);
+                item->setFlag(QGraphicsItem::ItemIsMovable, true);
+            }
         }
     } else {
         setDragMode(QGraphicsView::NoDrag);
         setInteractive(true);
         for (auto *item : m_scene->items()) {
-            item->setFlag(QGraphicsItem::ItemIsSelectable, false);
-            item->setFlag(QGraphicsItem::ItemIsMovable, false);
+            if (item != m_rasterPixmapItem) {
+                item->setFlag(QGraphicsItem::ItemIsSelectable, false);
+                item->setFlag(QGraphicsItem::ItemIsMovable, false);
+            }
         }
     }
 }
@@ -83,35 +94,40 @@ void BookCanvasView::setBrushOpacity(qreal opacity) {
     m_brushOpacity = opacity;
 }
 
-void BookCanvasView::eraseAtPoint(const QPointF &scenePos) {
-    qreal r = (m_brushSize * 2.2) / 2.0;
-    QRectF eraseRect(scenePos.x() - r, scenePos.y() - r, r * 2.0, r * 2.0);
+void BookCanvasView::paintStrokeSegment(const QPointF &p1, const QPointF &p2) {
+    QPainter painter(&m_rasterLayer);
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
-    QPainterPath eraseCircle;
-    eraseCircle.addEllipse(eraseRect);
+    if (m_brushSubtype == "eraser") {
+        painter.setCompositionMode(QPainter::CompositionMode_Clear);
+        QPen pen(Qt::transparent, m_brushSize * 2.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        painter.setPen(pen);
+        painter.drawLine(p1, p2);
+    } else {
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        QColor strokeColor = m_brushColor;
+        qreal width = m_brushSize;
 
-    auto itemsToInspect = m_scene->items(eraseRect);
-    for (auto *item : itemsToInspect) {
-        if (item->data(1).toBool() == true) {
-            continue;
+        if (m_brushSubtype == "watercolor") {
+            strokeColor.setAlphaF(0.25);
+            width = m_brushSize * 1.6;
+        } else if (m_brushSubtype == "marker") {
+            strokeColor.setAlphaF(0.85);
+            width = m_brushSize * 1.25;
+        } else if (m_brushSubtype == "crayon") {
+            strokeColor.setAlphaF(0.70);
+            width = m_brushSize * 1.35;
+        } else {
+            strokeColor.setAlphaF(m_brushOpacity);
         }
 
-        auto *pathItem = dynamic_cast<QGraphicsPathItem*>(item);
-        if (pathItem) {
-            QPainterPath itemLocalErase = pathItem->mapFromScene(eraseCircle);
-            QPainterPath currentPath = pathItem->path();
-
-            if (currentPath.intersects(itemLocalErase)) {
-                QPainterPath subtracted = currentPath.subtracted(itemLocalErase);
-                if (subtracted.isEmpty() || subtracted.length() < 1.0) {
-                    m_scene->removeItem(pathItem);
-                    delete pathItem;
-                } else {
-                    pathItem->setPath(subtracted);
-                }
-            }
-        }
+        QPen pen(strokeColor, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        painter.setPen(pen);
+        painter.drawLine(p1, p2);
     }
+
+    painter.end();
+    m_rasterPixmapItem->setPixmap(QPixmap::fromImage(m_rasterLayer));
 }
 
 void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
@@ -213,44 +229,16 @@ void BookCanvasView::mousePressEvent(QMouseEvent *event) {
 
     if (event->button() == Qt::RightButton) {
         QGraphicsItem *item = m_scene->itemAt(scenePos, transform());
+        if (item == m_rasterPixmapItem) item = nullptr;
         showContextMenu(event->globalPosition().toPoint(), item);
         event->accept();
         return;
     }
 
     if (m_mode == CanvasMode::Draw && event->button() == Qt::LeftButton) {
-        if (m_brushSubtype == "eraser") {
-            m_isDrawing = true;
-            eraseAtPoint(scenePos);
-            event->accept();
-            return;
-        }
-
         m_isDrawing = true;
-        m_currentPath = QPainterPath(scenePos);
-
-        QColor strokeColor = m_brushColor;
-        qreal width = m_brushSize;
-
-        if (m_brushSubtype == "watercolor") {
-            strokeColor = m_brushColor;
-            strokeColor.setAlphaF(0.35);
-            width = m_brushSize * 1.6;
-        } else if (m_brushSubtype == "marker") {
-            strokeColor = m_brushColor;
-            strokeColor.setAlphaF(0.85);
-            width = m_brushSize * 1.3;
-        } else if (m_brushSubtype == "crayon") {
-            strokeColor = m_brushColor;
-            strokeColor.setAlphaF(0.75);
-            width = m_brushSize * 1.4;
-        } else {
-            strokeColor.setAlphaF(m_brushOpacity);
-        }
-
-        QPen pen(strokeColor, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
-        m_currentPathItem = m_scene->addPath(m_currentPath, pen);
-        m_currentPathItem->setZValue(100);
+        m_lastPoint = scenePos;
+        paintStrokeSegment(scenePos, scenePos);
         event->accept();
         return;
     }
@@ -259,6 +247,7 @@ void BookCanvasView::mousePressEvent(QMouseEvent *event) {
 
     if (m_mode == CanvasMode::Select) {
         auto selected = m_scene->selectedItems();
+        selected.removeAll(m_rasterPixmapItem);
         emit selectionChanged(selected.isEmpty() ? nullptr : selected.first());
     }
 }
@@ -275,16 +264,8 @@ void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
 
     if (m_mode == CanvasMode::Draw && m_isDrawing && (event->buttons() & Qt::LeftButton)) {
         QPointF scenePos = mapToScene(event->pos());
-        if (m_brushSubtype == "eraser") {
-            eraseAtPoint(scenePos);
-            event->accept();
-            return;
-        }
-
-        m_currentPath.lineTo(scenePos);
-        if (m_currentPathItem) {
-            m_currentPathItem->setPath(m_currentPath);
-        }
+        paintStrokeSegment(m_lastPoint, scenePos);
+        m_lastPoint = scenePos;
         event->accept();
         return;
     }
@@ -309,7 +290,6 @@ void BookCanvasView::mouseReleaseEvent(QMouseEvent *event) {
 
     if (m_mode == CanvasMode::Draw && event->button() == Qt::LeftButton && m_isDrawing) {
         m_isDrawing = false;
-        m_currentPathItem = nullptr;
         event->accept();
         return;
     }
@@ -326,7 +306,7 @@ void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *ite
         "QMenu::separator { height: 1px; background-color: #dcc6ab; margin: 4px 6px; }"
     );
 
-    if (item) {
+    if (item && item != m_rasterPixmapItem) {
         m_scene->clearSelection();
         item->setSelected(true);
         emit selectionChanged(item);
@@ -345,9 +325,7 @@ void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *ite
         connect(actDel, &QAction::triggered, [this, item]() { deleteItem(item); });
     } else {
         QAction *actResetZoom = menu.addAction("Reset View (Fit Book)");
-        connect(actResetZoom, &QAction::triggered, [this]() {
-            fitBookInView();
-        });
+        connect(actResetZoom, &QAction::triggered, this, &BookCanvasView::fitBookInView);
     }
 
     menu.exec(globalPos);
@@ -355,33 +333,32 @@ void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *ite
 
 void BookCanvasView::duplicateSelectedItem() {
     auto selected = m_scene->selectedItems();
+    selected.removeAll(m_rasterPixmapItem);
     if (!selected.isEmpty()) duplicateItem(selected.first());
 }
 
 void BookCanvasView::deleteSelectedItem() {
     auto selected = m_scene->selectedItems();
+    selected.removeAll(m_rasterPixmapItem);
     if (!selected.isEmpty()) deleteItem(selected.first());
 }
 
 void BookCanvasView::bringSelectedItemToFront() {
     auto selected = m_scene->selectedItems();
+    selected.removeAll(m_rasterPixmapItem);
     if (!selected.isEmpty()) bringItemToFront(selected.first());
 }
 
 void BookCanvasView::sendSelectedItemToBack() {
     auto selected = m_scene->selectedItems();
+    selected.removeAll(m_rasterPixmapItem);
     if (!selected.isEmpty()) sendItemToBack(selected.first());
 }
 
 void BookCanvasView::duplicateItem(QGraphicsItem *item) {
-    if (!item) return;
+    if (!item || item == m_rasterPixmapItem) return;
 
-    if (auto *pathItem = dynamic_cast<QGraphicsPathItem*>(item)) {
-        auto *copy = m_scene->addPath(pathItem->path(), pathItem->pen(), pathItem->brush());
-        copy->setPos(pathItem->pos() + QPointF(20, 20));
-        copy->setZValue(pathItem->zValue() + 1);
-        copy->setFlags(pathItem->flags());
-    } else if (auto *rectItem = dynamic_cast<QGraphicsRectItem*>(item)) {
+    if (auto *rectItem = dynamic_cast<QGraphicsRectItem*>(item)) {
         auto *copy = m_scene->addRect(rectItem->rect(), rectItem->pen(), rectItem->brush());
         copy->setPos(rectItem->pos() + QPointF(20, 20));
         copy->setZValue(rectItem->zValue() + 1);
@@ -395,32 +372,32 @@ void BookCanvasView::duplicateItem(QGraphicsItem *item) {
 }
 
 void BookCanvasView::deleteItem(QGraphicsItem *item) {
-    if (!item) return;
+    if (!item || item == m_rasterPixmapItem) return;
     m_scene->removeItem(item);
     delete item;
     emit selectionChanged(nullptr);
 }
 
 void BookCanvasView::bringItemToFront(QGraphicsItem *item) {
-    if (!item) return;
+    if (!item || item == m_rasterPixmapItem) return;
     qreal maxZ = 0;
     for (auto *i : m_scene->items()) {
-        if (i->zValue() > maxZ) maxZ = i->zValue();
+        if (i != m_rasterPixmapItem && i->zValue() > maxZ) maxZ = i->zValue();
     }
     item->setZValue(maxZ + 1);
 }
 
 void BookCanvasView::sendItemToBack(QGraphicsItem *item) {
-    if (!item) return;
+    if (!item || item == m_rasterPixmapItem) return;
     qreal minZ = 0;
     for (auto *i : m_scene->items()) {
-        if (i->zValue() < minZ) minZ = i->zValue();
+        if (i != m_rasterPixmapItem && i->zValue() < minZ) minZ = i->zValue();
     }
     item->setZValue(minZ - 1);
 }
 
 void BookCanvasView::toggleLockItem(QGraphicsItem *item) {
-    if (!item) return;
+    if (!item || item == m_rasterPixmapItem) return;
     bool isMovable = item->flags().testFlag(QGraphicsItem::ItemIsMovable);
     item->setFlag(QGraphicsItem::ItemIsMovable, !isMovable);
 }
