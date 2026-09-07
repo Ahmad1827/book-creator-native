@@ -10,7 +10,8 @@ BookCanvasView::BookCanvasView(QWidget *parent)
       m_scene(new QGraphicsScene(this)),
       m_theme(THEMES[0]) {
 
-    m_scene->setSceneRect(0, 0, 1200, 650);
+    // Expand sceneRect to an infinite workspace so panning is never bounded
+    m_scene->setSceneRect(-10000, -10000, 21200, 20650);
     setScene(m_scene);
 
     setRenderHint(QPainter::Antialiasing, true);
@@ -27,6 +28,7 @@ BookCanvasView::BookCanvasView(QWidget *parent)
     m_rasterLayer.fill(Qt::transparent);
 
     m_rasterPixmapItem = m_scene->addPixmap(QPixmap::fromImage(m_rasterLayer));
+    m_rasterPixmapItem->setPos(0, 0);
     m_rasterPixmapItem->setZValue(100);
     m_rasterPixmapItem->setAcceptedMouseButtons(Qt::NoButton);
 
@@ -55,7 +57,7 @@ void BookCanvasView::setMode(CanvasMode mode) {
     m_mode = mode;
 
     if (m_mode == CanvasMode::Pan) {
-        setDragMode(QGraphicsView::ScrollHandDrag);
+        setDragMode(QGraphicsView::NoDrag);
         setInteractive(false);
     } else if (m_mode == CanvasMode::Select) {
         setDragMode(QGraphicsView::RubberBandDrag);
@@ -135,18 +137,21 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 
     painter->save();
 
-    QRectF deskRect = m_scene->sceneRect().adjusted(-1600, -1600, 1600, 1600);
-    QLinearGradient deskGrad(deskRect.topLeft(), deskRect.bottomLeft());
+    // Fill the infinite studio desk
+    QRectF deskRect = m_scene->sceneRect();
+    QLinearGradient deskGrad(0, -10000, 0, 10650);
     deskGrad.setColorAt(0.0, QColor("#442617"));
     deskGrad.setColorAt(0.5, QColor("#351c0f"));
     deskGrad.setColorAt(1.0, QColor("#29150b"));
     painter->fillRect(deskRect, deskGrad);
 
+    // Book casing
     QRectF casingRect(-18, -14, 1236, 678);
     painter->setBrush(m_theme.spineColor);
     painter->setPen(QPen(QColor(0, 0, 0, 140), 2));
     painter->drawRoundedRect(casingRect, 10, 10);
 
+    // Dual pages
     QRectF leftPage(0, 0, 600, 650);
     QRectF rightPage(600, 0, 600, 650);
 
@@ -155,6 +160,7 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
     painter->drawRect(leftPage);
     painter->drawRect(rightPage);
 
+    // Shading
     QLinearGradient leftEdgeGrad(0, 0, 40, 0);
     leftEdgeGrad.setColorAt(0.0, QColor(0, 0, 0, 35));
     leftEdgeGrad.setColorAt(1.0, QColor(0, 0, 0, 0));
@@ -187,12 +193,18 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 }
 
 void BookCanvasView::wheelEvent(QWheelEvent *event) {
-    const qreal factor = 1.12;
-    if (event->angleDelta().y() > 0) {
-        scale(factor, factor);
-    } else {
-        scale(1.0 / factor, 1.0 / factor);
-    }
+    const qreal factor = (event->angleDelta().y() > 0) ? 1.12 : (1.0 / 1.12);
+
+    // Pin the point under the mouse cursor in scene coordinates
+    QPoint mousePos = event->position().toPoint();
+    QPointF targetScenePos = mapToScene(mousePos);
+
+    scale(factor, factor);
+
+    // Shift view center so targetScenePos stays anchored under mousePos
+    QPointF delta = targetScenePos - mapToScene(mousePos);
+    centerOn(mapToScene(viewport()->rect().center()) + delta);
+
     event->accept();
 }
 
@@ -214,7 +226,7 @@ void BookCanvasView::keyReleaseEvent(QKeyEvent *event) {
 }
 
 void BookCanvasView::mousePressEvent(QMouseEvent *event) {
-    if (event->button() == Qt::MiddleButton || (event->button() == Qt::LeftButton && m_spacePressed)) {
+    if (event->button() == Qt::MiddleButton || (event->button() == Qt::LeftButton && (m_spacePressed || m_mode == CanvasMode::Pan))) {
         if (event->button() == Qt::MiddleButton) m_isMiddlePanning = true;
         else m_isSpacePanning = true;
         m_lastPanPoint = event->pos();
@@ -256,8 +268,12 @@ void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
     if (m_isMiddlePanning || m_isSpacePanning) {
         QPoint delta = event->pos() - m_lastPanPoint;
         m_lastPanPoint = event->pos();
-        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
-        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+
+        // Natural hand drag: moving hand right pulls the canvas rightward
+        QPointF deltaScene = mapToScene(delta) - mapToScene(QPoint(0, 0));
+        QPointF currentCenter = mapToScene(viewport()->rect().center());
+        centerOn(currentCenter - deltaScene);
+
         event->accept();
         return;
     }

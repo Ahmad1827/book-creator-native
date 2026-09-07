@@ -91,3 +91,15 @@
 754	9707	1788800617468164370	CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o	b91d39f3d57d0651
 756	10622	1788800618383062337	CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o	448bba87826f5db2
 10623	11507	1788800619263108854	book-creator-native	40cb9d3f8a946f75
+6	54	1788802860187885491	book-creator-native_autogen/timestamp	7abf432f3ccee7c0
+6	54	1788802860187885491	book-creator-native_autogen/mocs_compilation.cpp	7abf432f3ccee7c0
+6	54	1788802860187885491	/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/timestamp	7abf432f3ccee7c0
+6	54	1788802860187885491	/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/mocs_compilation.cpp	7abf432f3ccee7c0
+56	5049	1788802865182186075	CMakeFiles/book-creator-native.dir/src/canvas/book_canvas_view.cpp.o	85b886462b9821ca
+5049	6208	1788802866338358503	book-creator-native	40cb9d3f8a946f75
+7	60	1788803025594846187	book-creator-native_autogen/timestamp	7abf432f3ccee7c0
+7	60	1788803025594846187	book-creator-native_autogen/mocs_compilation.cpp	7abf432f3ccee7c0
+7	60	1788803025594846187	/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/timestamp	7abf432f3ccee7c0
+7	60	1788803025594846187	/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/mocs_compilation.cpp	7abf432f3ccee7c0
+62	4722	1788803030255807068	CMakeFiles/book-creator-native.dir/src/canvas/book_canvas_view.cpp.o	85b886462b9821ca
+4722	5419	1788803030951216843	book-creator-native	40cb9d3f8a946f75
