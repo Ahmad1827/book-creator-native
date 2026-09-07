@@ -10,6 +10,7 @@
 #include <QAction>
 #include "types.h"
 #include "constants.h"
+#include "theme_decors.h"
 
 enum class CanvasMode {
     Select,
@@ -27,7 +28,16 @@ public:
     void setMode(CanvasMode mode);
     void setBrushColor(const QColor &color);
     void setBrushSize(qreal size);
+    void setBrushOpacity(qreal opacity);
     void applyPageTemplate(const QString &side, const QString &templateType);
+
+    void addStoryShape(const QString &shapeType, const QColor &fill, const QColor &stroke, qreal strokeWidth);
+    void addStorySticker(const QString &stickerId, const QString &svgPath, const QColor &fill);
+
+    void duplicateSelectedItem();
+    void deleteSelectedItem();
+    void bringSelectedItemToFront();
+    void sendSelectedItemToBack();
 
 signals:
     void activeSideChanged(const QString &side);
@@ -53,7 +63,9 @@ private:
     CanvasMode m_mode = CanvasMode::Draw;
     QColor m_brushColor = QColor("#1d291e");
     qreal m_brushSize = 4.0;
+    qreal m_brushOpacity = 1.0;
     bool m_isDrawing = false;
     QPainterPath m_currentPath;
     QGraphicsPathItem *m_currentPathItem = nullptr;
+    QString m_activeSide = "left";
 };

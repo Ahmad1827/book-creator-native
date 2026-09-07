@@ -20,8 +20,12 @@ add_executable(book-creator-native
     src/main.cpp
     src/models/types.h
     src/models/constants.h
+    src/canvas/theme_decors.h
+    src/canvas/theme_decors.cpp
     src/canvas/book_canvas_view.h
     src/canvas/book_canvas_view.cpp
+    src/ui/drawing_toolbox_dock.h
+    src/ui/drawing_toolbox_dock.cpp
     src/ui/main_window.h
     src/ui/main_window.cpp
 )

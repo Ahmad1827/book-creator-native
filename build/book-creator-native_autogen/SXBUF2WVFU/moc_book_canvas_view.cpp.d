@@ -1,5 +1,6 @@
 /home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/SXBUF2WVFU/moc_book_canvas_view.cpp: /home/ahmad/proiecte/book-creator-native/src/canvas/book_canvas_view.h \
   /home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/moc_predefs.h \
+  /home/ahmad/proiecte/book-creator-native/src/canvas/theme_decors.h \
   /home/ahmad/proiecte/book-creator-native/src/models/constants.h \
   /home/ahmad/proiecte/book-creator-native/src/models/types.h \
   /usr/include/alloca.h \
@@ -397,6 +398,7 @@
   /usr/include/x86_64-linux-gnu/qt6/QtGui/QAction \
   /usr/include/x86_64-linux-gnu/qt6/QtGui/QColor \
   /usr/include/x86_64-linux-gnu/qt6/QtGui/QMouseEvent \
+  /usr/include/x86_64-linux-gnu/qt6/QtGui/QPainter \
   /usr/include/x86_64-linux-gnu/qt6/QtGui/QTransform \
   /usr/include/x86_64-linux-gnu/qt6/QtGui/QWheelEvent \
   /usr/include/x86_64-linux-gnu/qt6/QtGui/qaction.h \

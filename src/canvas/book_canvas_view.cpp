@@ -3,6 +3,7 @@
 #include <QScrollBar>
 #include <QGraphicsRectItem>
 #include <QGraphicsEllipseItem>
+#include <QSvgRenderer>
 
 BookCanvasView::BookCanvasView(QWidget *parent)
     : QGraphicsView(parent),
@@ -62,6 +63,10 @@ void BookCanvasView::setBrushSize(qreal size) {
     m_brushSize = size;
 }
 
+void BookCanvasView::setBrushOpacity(qreal opacity) {
+    m_brushOpacity = opacity;
+}
+
 void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
     Q_UNUSED(rect);
 
@@ -113,6 +118,8 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
     painter->drawRect(leftPage.adjusted(12, 12, -12, -12));
     painter->drawRect(rightPage.adjusted(12, 12, -12, -12));
 
+    ThemeDecors::draw(painter, m_theme);
+
     painter->restore();
 }
 
@@ -128,7 +135,8 @@ void BookCanvasView::wheelEvent(QWheelEvent *event) {
 
 void BookCanvasView::mousePressEvent(QMouseEvent *event) {
     QPointF scenePos = mapToScene(event->pos());
-    emit activeSideChanged(scenePos.x() < 600 ? "left" : "right");
+    m_activeSide = scenePos.x() < 600 ? "left" : "right";
+    emit activeSideChanged(m_activeSide);
 
     if (event->button() == Qt::RightButton) {
         QGraphicsItem *item = m_scene->itemAt(scenePos, transform());
@@ -141,7 +149,10 @@ void BookCanvasView::mousePressEvent(QMouseEvent *event) {
         m_isDrawing = true;
         m_currentPath = QPainterPath(scenePos);
 
-        QPen pen(m_brushColor, m_brushSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        QColor strokeColor = m_brushColor;
+        strokeColor.setAlphaF(m_brushOpacity);
+
+        QPen pen(strokeColor, m_brushSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
         m_currentPathItem = m_scene->addPath(m_currentPath, pen);
         m_currentPathItem->setZValue(100);
         event->accept();
@@ -218,6 +229,26 @@ void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *ite
     menu.exec(globalPos);
 }
 
+void BookCanvasView::duplicateSelectedItem() {
+    auto selected = m_scene->selectedItems();
+    if (!selected.isEmpty()) duplicateItem(selected.first());
+}
+
+void BookCanvasView::deleteSelectedItem() {
+    auto selected = m_scene->selectedItems();
+    if (!selected.isEmpty()) deleteItem(selected.first());
+}
+
+void BookCanvasView::bringSelectedItemToFront() {
+    auto selected = m_scene->selectedItems();
+    if (!selected.isEmpty()) bringItemToFront(selected.first());
+}
+
+void BookCanvasView::sendSelectedItemToBack() {
+    auto selected = m_scene->selectedItems();
+    if (!selected.isEmpty()) sendItemToBack(selected.first());
+}
+
 void BookCanvasView::duplicateItem(QGraphicsItem *item) {
     if (!item) return;
 
@@ -268,6 +299,81 @@ void BookCanvasView::toggleLockItem(QGraphicsItem *item) {
     if (!item) return;
     bool isMovable = item->flags().testFlag(QGraphicsItem::ItemIsMovable);
     item->setFlag(QGraphicsItem::ItemIsMovable, !isMovable);
+}
+
+void BookCanvasView::addStoryShape(const QString &shapeType, const QColor &fill, const QColor &stroke, qreal strokeWidth) {
+    qreal posX = (m_activeSide == "left") ? 220.0 : 820.0;
+    qreal posY = 220.0;
+
+    QPen pen(stroke, strokeWidth);
+    QBrush brush(fill);
+
+    QGraphicsItem *item = nullptr;
+
+    if (shapeType == "circle" || shapeType == "round") {
+        item = m_scene->addEllipse(posX, posY, 100, 100, pen, brush);
+    } else if (shapeType == "rect" || shapeType == "frame") {
+        item = m_scene->addRect(posX, posY, 140, 90, pen, brush);
+    } else if (shapeType == "star") {
+        QPainterPath p;
+        p.moveTo(posX + 50, posY + 0);
+        p.lineTo(posX + 63, posY + 35);
+        p.lineTo(posX + 100, posY + 35);
+        p.lineTo(posX + 70, posY + 57);
+        p.lineTo(posX + 81, posY + 92);
+        p.lineTo(posX + 50, posY + 70);
+        p.lineTo(posX + 19, posY + 92);
+        p.lineTo(posX + 30, posY + 57);
+        p.lineTo(posX + 0, posY + 35);
+        p.lineTo(posX + 37, posY + 35);
+        p.closeSubpath();
+        item = m_scene->addPath(p, pen, brush);
+    } else if (shapeType == "heart") {
+        QPainterPath p;
+        p.moveTo(posX + 70, posY + 20);
+        p.cubicTo(posX + 35, posY - 15, posX + 0, posY + 40, posX + 70, posY + 90);
+        p.cubicTo(posX + 140, posY + 40, posX + 105, posY - 15, posX + 70, posY + 20);
+        item = m_scene->addPath(p, pen, brush);
+    } else {
+        item = m_scene->addRect(posX, posY, 120, 80, pen, brush);
+    }
+
+    if (item) {
+        item->setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemIsMovable);
+        item->setZValue(50);
+        m_scene->clearSelection();
+        item->setSelected(true);
+        emit selectionChanged(item);
+    }
+}
+
+void BookCanvasView::addStorySticker(const QString &stickerId, const QString &svgPath, const QColor &fill) {
+    Q_UNUSED(stickerId);
+    qreal posX = (m_activeSide == "left") ? 250.0 : 850.0;
+    qreal posY = 220.0;
+
+    QString fullSvg = QString(R"(
+        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <path d="%1" fill="%2" stroke="#2c211a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+    )").arg(svgPath, fill.name());
+
+    QSvgRenderer renderer(fullSvg.toUtf8());
+    QImage image(100, 100, QImage::Format_ARGB32_Premultiplied);
+    image.fill(Qt::transparent);
+
+    QPainter painter(&image);
+    renderer.render(&painter);
+    painter.end();
+
+    auto *pixmapItem = m_scene->addPixmap(QPixmap::fromImage(image));
+    pixmapItem->setPos(posX, posY);
+    pixmapItem->setFlags(QGraphicsItem::ItemIsSelectable | QGraphicsItem::ItemIsMovable);
+    pixmapItem->setZValue(55);
+
+    m_scene->clearSelection();
+    pixmapItem->setSelected(true);
+    emit selectionChanged(pixmapItem);
 }
 
 void BookCanvasView::applyPageTemplate(const QString &side, const QString &templateType) {
