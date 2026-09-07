@@ -27,6 +27,7 @@ public:
 
     void setTheme(const BookTheme &theme);
     void setMode(CanvasMode mode);
+    void setBrushSubtype(const QString &subtype);
     void setBrushColor(const QColor &color);
     void setBrushSize(qreal size);
     void setBrushOpacity(qreal opacity);
@@ -62,10 +63,12 @@ private:
     void bringItemToFront(QGraphicsItem *item);
     void sendItemToBack(QGraphicsItem *item);
     void toggleLockItem(QGraphicsItem *item);
+    void eraseAtPoint(const QPointF &scenePos);
 
     QGraphicsScene *m_scene;
     BookTheme m_theme;
     CanvasMode m_mode = CanvasMode::Draw;
+    QString m_brushSubtype = "ink";
     QColor m_brushColor = QColor("#1d291e");
     qreal m_brushSize = 4.0;
     qreal m_brushOpacity = 1.0;

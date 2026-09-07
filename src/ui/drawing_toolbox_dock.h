@@ -12,6 +12,7 @@
 #include <QButtonGroup>
 #include <QColorDialog>
 #include <QIcon>
+#include <QPropertyAnimation>
 #include "types.h"
 #include "constants.h"
 
@@ -38,6 +39,7 @@ private:
     void setupUi();
     void buildIconRail();
     void buildDrawerPages();
+    void animateDrawer(bool open);
     QIcon createSvgIcon(const QString &pathD, const QString &fillColor = "#5c351f");
 
     QWidget *createPencilPage();
@@ -52,6 +54,7 @@ private:
     QStackedWidget *m_stackedDrawer;
     QLabel *m_drawerTitle;
 
+    QString m_selectedSubtype = "ink";
     QColor m_currentBrushColor = QColor("#1d291e");
     qreal m_currentBrushSize = 4.0;
     qreal m_currentBrushOpacity = 1.0;
@@ -62,4 +65,8 @@ private:
 
     bool m_isDrawerOpen = false;
     QButtonGroup *m_railGroup;
+    QButtonGroup *m_brushGroup;
+    QButtonGroup *m_leadGroup;
+    QList<QPushButton*> m_colorSwatches;
+    QList<QPushButton*> m_fillSwatches;
 };

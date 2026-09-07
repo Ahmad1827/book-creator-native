@@ -100,7 +100,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_toolboxDock, &DrawingToolboxDock::deleteRequested, m_canvasView, &BookCanvasView::deleteSelectedItem);
     connect(m_toolboxDock, &DrawingToolboxDock::bringForwardRequested, m_canvasView, &BookCanvasView::bringSelectedItemToFront);
     connect(m_toolboxDock, &DrawingToolboxDock::sendBackwardRequested, m_canvasView, &BookCanvasView::sendSelectedItemToBack);
-
+    connect(m_toolboxDock, &DrawingToolboxDock::brushSubtypeSelected, m_canvasView, &BookCanvasView::setBrushSubtype);
     connect(m_layersDock, &LayersDock::applyTemplateRequested, m_canvasView, &BookCanvasView::applyPageTemplate);
 
     connect(m_layersDock, &LayersDock::addLayerRequested, [this]() {

@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QPropertyAnimation>
 #include "types.h"
 
 class LayersDock : public QWidget {
@@ -37,6 +38,7 @@ private:
     QWidget *createTemplatesTab();
     QWidget *createLayersTab();
     void refreshLayersList();
+    void animatePanel(bool open);
 
     QPushButton *m_handleBtn;
     QFrame *m_contentFrame;

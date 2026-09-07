@@ -16,7 +16,7 @@ QIcon DrawingToolboxDock::createSvgIcon(const QString &pathD, const QString &fil
     ).arg(pathD, fillColor);
 
     QSvgRenderer renderer(svg.toUtf8());
-    QPixmap pix(28, 28);
+    QPixmap pix(24, 24);
     pix.fill(Qt::transparent);
 
     QPainter painter(&pix);
@@ -34,25 +34,24 @@ void DrawingToolboxDock::setupUi() {
     buildIconRail();
 
     m_drawer = new QFrame(this);
-    m_drawer->setFixedWidth(290);
+    m_drawer->setFixedWidth(0);
     m_drawer->setStyleSheet(
-        "QFrame { background: #fbf5ea; border-right: 3px solid #8d6b4f; }"
+        "QFrame { background: #fbf5ea; border-right: 2px solid #8d6b4f; }"
         "QLabel { color: #3b2212; font-weight: bold; }"
     );
 
     QVBoxLayout *drawerLayout = new QVBoxLayout(m_drawer);
-    drawerLayout->setContentsMargins(10, 10, 10, 10);
-    drawerLayout->setSpacing(10);
+    drawerLayout->setContentsMargins(14, 14, 14, 14);
+    drawerLayout->setSpacing(12);
 
     QHBoxLayout *headerLayout = new QHBoxLayout();
     m_drawerTitle = new QLabel("Tool Settings", m_drawer);
     m_drawerTitle->setStyleSheet("font-size: 13px; font-weight: 800; color: #3b2212;");
     QPushButton *btnClose = new QPushButton("✕", m_drawer);
     btnClose->setFixedSize(24, 24);
-    btnClose->setStyleSheet("background: transparent; border: none; font-size: 14px; color: #7a5c43; font-weight: bold;");
+    btnClose->setStyleSheet("background: transparent; border: none; font-size: 13px; color: #7a5c43; font-weight: bold;");
     connect(btnClose, &QPushButton::clicked, [this]() {
-        m_isDrawerOpen = false;
-        m_drawer->setVisible(false);
+        animateDrawer(false);
     });
 
     headerLayout->addWidget(m_drawerTitle);
@@ -61,17 +60,30 @@ void DrawingToolboxDock::setupUi() {
     drawerLayout->addLayout(headerLayout);
 
     buildDrawerPages();
-    drawerLayout->addWidget(m_stackedDrawer);
+    drawerLayout->addWidget(m_stackedDrawer, 1);
 
     mainLayout->addWidget(m_iconRail);
     mainLayout->addWidget(m_drawer);
+}
 
-    m_drawer->setVisible(false);
+void DrawingToolboxDock::animateDrawer(bool open) {
+    m_isDrawerOpen = open;
+    QPropertyAnimation *anim = new QPropertyAnimation(m_drawer, "minimumWidth", this);
+    anim->setDuration(200);
+    anim->setEasingCurve(QEasingCurve::OutCubic);
+    anim->setStartValue(m_drawer->width());
+    anim->setEndValue(open ? 320 : 0);
+
+    connect(anim, &QPropertyAnimation::valueChanged, [this](const QVariant &val) {
+        m_drawer->setMaximumWidth(val.toInt());
+    });
+
+    anim->start(QAbstractAnimation::DeleteWhenStopped);
 }
 
 void DrawingToolboxDock::buildIconRail() {
     m_iconRail = new QWidget(this);
-    m_iconRail->setFixedWidth(56);
+    m_iconRail->setFixedWidth(54);
     m_iconRail->setStyleSheet(
         "QWidget { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #381f13, stop:1 #2b170c); border-right: 2px solid #1c0e07; }"
         "QPushButton { background: #fbf5ea; border: 1.5px solid #bda383; border-radius: 8px; margin: 2px 0; }"
@@ -81,7 +93,7 @@ void DrawingToolboxDock::buildIconRail() {
     );
 
     QVBoxLayout *railLayout = new QVBoxLayout(m_iconRail);
-    railLayout->setContentsMargins(6, 12, 6, 12);
+    railLayout->setContentsMargins(5, 10, 5, 10);
     railLayout->setSpacing(6);
 
     m_railGroup = new QButtonGroup(this);
@@ -89,7 +101,7 @@ void DrawingToolboxDock::buildIconRail() {
 
     auto createRailButton = [this, railLayout](const QString &svgPath, int pageIdx, const QString &toolId, const QString &title, const QString &tooltip) {
         QPushButton *btn = new QPushButton(m_iconRail);
-        btn->setFixedSize(44, 42);
+        btn->setFixedSize(44, 40);
         btn->setCheckable(true);
         btn->setIcon(createSvgIcon(svgPath));
         btn->setIconSize(QSize(20, 20));
@@ -102,11 +114,9 @@ void DrawingToolboxDock::buildIconRail() {
             if (pageIdx >= 0) {
                 m_drawerTitle->setText(title);
                 m_stackedDrawer->setCurrentIndex(pageIdx);
-                m_isDrawerOpen = true;
-                m_drawer->setVisible(true);
+                animateDrawer(true);
             } else {
-                m_isDrawerOpen = false;
-                m_drawer->setVisible(false);
+                animateDrawer(false);
             }
         });
 
@@ -138,14 +148,25 @@ void DrawingToolboxDock::buildDrawerPages() {
 }
 
 QWidget *DrawingToolboxDock::createPencilPage() {
-    QWidget *page = new QWidget();
-    QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    QLabel *lblLead = new QLabel("Graphite Grade", page);
+    QWidget *page = new QWidget(scroll);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(4, 4, 10, 4);
+    layout->setSpacing(10);
+
+    QLabel *lblLead = new QLabel("GRAPHITE GRADE", page);
+    lblLead->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px;");
     layout->addWidget(lblLead);
 
     QHBoxLayout *leadsLayout = new QHBoxLayout();
+    leadsLayout->setSpacing(6);
+    m_leadGroup = new QButtonGroup(page);
+    m_leadGroup->setExclusive(true);
+
     struct LeadConfig { QString name; QString color; qreal size; qreal opacity; };
     QList<LeadConfig> leads = {
         {"HB", "#3a3430", 2.0, 0.7},
@@ -154,19 +175,30 @@ QWidget *DrawingToolboxDock::createPencilPage() {
         {"Sepia", "#593c28", 3.0, 0.85}
     };
 
-    for (const auto &lead : leads) {
+    for (int i = 0; i < leads.size(); ++i) {
+        const auto &lead = leads[i];
         QPushButton *btn = new QPushButton(lead.name, page);
-        btn->setStyleSheet("background: #f3e9d8; border: 1.5px solid #d4be9f; border-radius: 6px; padding: 6px 0; font-weight: 800;");
+        btn->setCheckable(true);
+        btn->setStyleSheet(
+            "QPushButton { background: #f3e9d8; border: 1.5px solid #d4be9f; border-radius: 6px; padding: 7px 0; font-weight: 800; color: #3b2212; }"
+            "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+            "QPushButton:checked { background: #3b2212; color: #fbf5ea; border-color: #3b2212; }"
+        );
+        m_leadGroup->addButton(btn, i);
         connect(btn, &QPushButton::clicked, [this, lead]() {
             emit brushColorSelected(QColor(lead.color));
             emit brushSizeSelected(lead.size);
             emit brushOpacitySelected(lead.opacity);
         });
         leadsLayout->addWidget(btn);
+        if (i == 1) btn->setChecked(true);
     }
     layout->addLayout(leadsLayout);
 
-    QLabel *lblSize = new QLabel("Lead Thickness", page);
+    QLabel *lblSize = new QLabel("LEAD THICKNESS", page);
+    lblSize->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px; margin-top: 6px;");
+    layout->addWidget(lblSize);
+
     QSlider *sliderSize = new QSlider(Qt::Horizontal, page);
     sliderSize->setRange(1, 18);
     sliderSize->setValue(3);
@@ -174,39 +206,84 @@ QWidget *DrawingToolboxDock::createPencilPage() {
         emit brushSizeSelected(val);
     });
 
-    layout->addWidget(lblSize);
     layout->addWidget(sliderSize);
     layout->addStretch();
-    return page;
+
+    scroll->setWidget(page);
+    return scroll;
 }
 
 QWidget *DrawingToolboxDock::createBrushPage() {
-    QWidget *page = new QWidget();
-    QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    QLabel *lblType = new QLabel("Brush Medium", page);
+    QWidget *page = new QWidget(scroll);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(6, 6, 12, 6);
+    layout->setSpacing(8);
+
+    QLabel *lblType = new QLabel("BRUSH MEDIUM", page);
+    lblType->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 2px; margin-bottom: 2px;");
     layout->addWidget(lblType);
 
-    struct BrushEntry { QString name; QString id; };
+    m_brushGroup = new QButtonGroup(page);
+    m_brushGroup->setExclusive(true);
+
+    struct BrushEntry { QString name; QString id; QString desc; };
     QList<BrushEntry> brushes = {
-        {"Fountain Pen", "ink"},
-        {"Watercolor Wash", "watercolor"},
-        {"Felt Marker", "marker"},
-        {"Wax Crayon", "crayon"},
-        {"Stroke Eraser", "eraser"}
+        {"Fountain Pen", "ink", "Crisp linework"},
+        {"Watercolor Wash", "watercolor", "Soft translucent fill"},
+        {"Felt Marker", "marker", "Rich vivid color"},
+        {"Wax Crayon", "crayon", "Textured granulate"},
+        {"Stroke Eraser", "eraser", "Cuts ink strokes directly"}
     };
 
-    for (const auto &b : brushes) {
-        QPushButton *btn = new QPushButton(b.name, page);
-        btn->setStyleSheet("background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 8px; text-align: left; font-weight: 800;");
+    for (int i = 0; i < brushes.size(); ++i) {
+        const auto &b = brushes[i];
+        QPushButton *btn = new QPushButton(page);
+        btn->setCheckable(true);
+        btn->setText(QString("%1\n%2").arg(b.name, b.desc));
+        btn->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+        btn->setStyleSheet(
+            "QPushButton { "
+            "   background: #fdfaf5; "
+            "   border: 1.5px solid #dcc6ab; "
+            "   border-radius: 8px; "
+            "   padding: 10px 14px; "
+            "   text-align: left; "
+            "   color: #3b2212; "
+            "   font-weight: 800; "
+            "   font-size: 11px; "
+            "   line-height: 14px; "
+            "} "
+            "QPushButton:hover { "
+            "   background: #ffffff; "
+            "   border-color: #8b5b32; "
+            "} "
+            "QPushButton:checked { "
+            "   background: #faede0; "
+            "   border-color: #8b5b32; "
+            "   border-width: 2px; "
+            "}"
+        );
+
+        m_brushGroup->addButton(btn, i);
+
         connect(btn, &QPushButton::clicked, [this, b]() {
+            m_selectedSubtype = b.id;
             emit brushSubtypeSelected(b.id);
         });
+
         layout->addWidget(btn);
+        if (b.id == "ink") btn->setChecked(true);
     }
 
-    QLabel *lblSize = new QLabel("Brush Thickness", page);
+    QLabel *lblSize = new QLabel("BRUSH THICKNESS", page);
+    lblSize->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 2px; margin-top: 8px;");
+    layout->addWidget(lblSize);
+
     QSlider *sliderSize = new QSlider(Qt::Horizontal, page);
     sliderSize->setRange(2, 70);
     sliderSize->setValue(5);
@@ -214,16 +291,23 @@ QWidget *DrawingToolboxDock::createBrushPage() {
         emit brushSizeSelected(val);
     });
 
-    layout->addWidget(lblSize);
     layout->addWidget(sliderSize);
     layout->addStretch();
-    return page;
+
+    scroll->setWidget(page);
+    return scroll;
 }
 
 QWidget *DrawingToolboxDock::createPalettePage() {
-    QWidget *page = new QWidget();
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    QWidget *page = new QWidget(scroll);
     QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(4, 4, 10, 4);
+    layout->setSpacing(8);
 
     struct PaletteEntry { QString name; QStringList colors; };
     QList<PaletteEntry> collections = {
@@ -235,15 +319,25 @@ QWidget *DrawingToolboxDock::createPalettePage() {
 
     for (const auto &col : collections) {
         QLabel *lbl = new QLabel(col.name, page);
+        lbl->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px; margin-top: 4px;");
         layout->addWidget(lbl);
 
         QHBoxLayout *row = new QHBoxLayout();
+        row->setSpacing(6);
         for (const auto &hex : col.colors) {
             QPushButton *swatch = new QPushButton(page);
-            swatch->setFixedSize(26, 26);
-            swatch->setStyleSheet(QString("background: %1; border: 1.5px solid #bda383; border-radius: 13px;").arg(hex));
-            connect(swatch, &QPushButton::clicked, [this, hex]() {
-                emit brushColorSelected(QColor(hex));
+            swatch->setCheckable(true);
+            swatch->setFixedSize(28, 28);
+            swatch->setStyleSheet(QString(
+                "QPushButton { background: %1; border: 2px solid #bda383; border-radius: 14px; }"
+                "QPushButton:hover { border-color: #ffffff; border-width: 2.5px; }"
+                "QPushButton:checked { border: 3px solid #3b2212; }"
+            ).arg(hex));
+            m_colorSwatches.append(swatch);
+            connect(swatch, &QPushButton::clicked, [this, hex, swatch]() {
+                for (auto *s : m_colorSwatches) s->setChecked(s == swatch);
+                m_currentBrushColor = QColor(hex);
+                emit brushColorSelected(m_currentBrushColor);
             });
             row->addWidget(swatch);
         }
@@ -251,33 +345,51 @@ QWidget *DrawingToolboxDock::createPalettePage() {
     }
 
     QPushButton *btnPick = new QPushButton("Pick Custom Color", page);
-    btnPick->setStyleSheet("background: #f3e9d8; border: 1.5px solid #bda383; border-radius: 6px; padding: 6px; font-weight: 800;");
+    btnPick->setStyleSheet(
+        "QPushButton { background: #f3e9d8; border: 1.5px solid #bda383; border-radius: 6px; padding: 8px 12px; font-weight: 800; color: #3b2212; margin-top: 10px; }"
+        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+    );
     connect(btnPick, &QPushButton::clicked, [this]() {
         QColor col = QColorDialog::getColor(m_currentBrushColor, this, "Select Color");
         if (col.isValid()) {
+            m_currentBrushColor = col;
+            for (auto *s : m_colorSwatches) s->setChecked(false);
             emit brushColorSelected(col);
         }
     });
     layout->addWidget(btnPick);
     layout->addStretch();
-    return page;
+
+    scroll->setWidget(page);
+    return scroll;
 }
 
 QWidget *DrawingToolboxDock::createShapesPage() {
-    QWidget *page = new QWidget();
-    QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    QLabel *lblShapes = new QLabel("Storybook Shapes", page);
+    QWidget *page = new QWidget(scroll);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(4, 4, 10, 4);
+    layout->setSpacing(8);
+
+    QLabel *lblShapes = new QLabel("STORY SHAPES", page);
+    lblShapes->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px;");
     layout->addWidget(lblShapes);
 
     QGridLayout *grid = new QGridLayout();
+    grid->setSpacing(6);
     QStringList shapes = {"star", "heart", "cloud", "moon", "flower", "speech", "thought", "circle", "rect"};
 
     int r = 0, c = 0;
     for (const auto &s : shapes) {
         QPushButton *btn = new QPushButton(s.toUpper(), page);
-        btn->setStyleSheet("background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 8px 4px; font-weight: 800;");
+        btn->setStyleSheet(
+            "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 8px 2px; font-weight: 800; font-size: 10px; color: #3b2212; }"
+            "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+        );
         connect(btn, &QPushButton::clicked, [this, s]() {
             emit shapeAdded(s, m_shapeFill, m_shapeStroke, m_shapeStrokeWidth);
         });
@@ -286,37 +398,46 @@ QWidget *DrawingToolboxDock::createShapesPage() {
     }
     layout->addLayout(grid);
 
-    QLabel *lblFill = new QLabel("Fill Pigment", page);
+    QLabel *lblFill = new QLabel("FILL PIGMENT", page);
+    lblFill->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px; margin-top: 8px;");
     layout->addWidget(lblFill);
+
     QHBoxLayout *fillRow = new QHBoxLayout();
+    fillRow->setSpacing(6);
     QStringList fillPresets = {"#dda15e", "#c68b59", "#e07a5f", "#819b7a", "#3d5a80", "#faf5ec"};
     for (const auto &hex : fillPresets) {
         QPushButton *swatch = new QPushButton(page);
-        swatch->setFixedSize(24, 24);
-        swatch->setStyleSheet(QString("background: %1; border: 1.5px solid #bda383; border-radius: 12px;").arg(hex));
-        connect(swatch, &QPushButton::clicked, [this, hex]() {
+        swatch->setCheckable(true);
+        swatch->setFixedSize(26, 26);
+        swatch->setStyleSheet(QString(
+            "QPushButton { background: %1; border: 2px solid #bda383; border-radius: 13px; }"
+            "QPushButton:hover { border-color: #ffffff; border-width: 2.5px; }"
+            "QPushButton:checked { border: 3px solid #3b2212; }"
+        ).arg(hex));
+        m_fillSwatches.append(swatch);
+        connect(swatch, &QPushButton::clicked, [this, hex, swatch]() {
+            for (auto *f : m_fillSwatches) f->setChecked(f == swatch);
             m_shapeFill = QColor(hex);
         });
         fillRow->addWidget(swatch);
+        if (hex == "#dda15e") swatch->setChecked(true);
     }
     layout->addLayout(fillRow);
 
     layout->addStretch();
-    return page;
+    scroll->setWidget(page);
+    return scroll;
 }
 
 QWidget *DrawingToolboxDock::createStickersPage() {
-    QWidget *page = new QWidget();
-    QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
-
-    QScrollArea *scroll = new QScrollArea(page);
+    QScrollArea *scroll = new QScrollArea(this);
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 
-    QWidget *scrollContent = new QWidget(scroll);
-    QVBoxLayout *contentLayout = new QVBoxLayout(scrollContent);
-    contentLayout->setContentsMargins(0, 0, 0, 0);
+    QWidget *page = new QWidget(scroll);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(4, 4, 10, 4);
 
     struct StickerEntry { QString id; QString name; QString fill; QString svg; };
     QList<StickerEntry> stickers = {
@@ -329,39 +450,53 @@ QWidget *DrawingToolboxDock::createStickersPage() {
     };
 
     QGridLayout *grid = new QGridLayout();
+    grid->setSpacing(8);
     int r = 0, c = 0;
     for (const auto &stk : stickers) {
-        QPushButton *btn = new QPushButton(stk.name, scrollContent);
-        btn->setStyleSheet(QString("background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 12px 6px; font-weight: 800; color: %1;").arg(stk.fill));
+        QPushButton *btn = new QPushButton(stk.name, page);
+        btn->setStyleSheet(QString(
+            "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 10px 4px; font-weight: 800; font-size: 11px; color: %1; }"
+            "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+        ).arg(stk.fill));
         connect(btn, &QPushButton::clicked, [this, stk]() {
             emit stickerAdded(stk.id, stk.svg, QColor(stk.fill));
         });
         grid->addWidget(btn, r, c);
         if (++c > 1) { c = 0; ++r; }
     }
-    contentLayout->addLayout(grid);
-    contentLayout->addStretch();
+    layout->addLayout(grid);
+    layout->addStretch();
 
-    scroll->setWidget(scrollContent);
-    layout->addWidget(scroll);
-    return page;
+    scroll->setWidget(page);
+    return scroll;
 }
 
 QWidget *DrawingToolboxDock::createArrangePage() {
-    QWidget *page = new QWidget();
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    QWidget *page = new QWidget(scroll);
     QVBoxLayout *layout = new QVBoxLayout(page);
-    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setContentsMargins(4, 4, 10, 4);
+    layout->setSpacing(8);
 
     QPushButton *btnFront = new QPushButton("Bring to Front", page);
     QPushButton *btnBack = new QPushButton("Send to Back", page);
     QPushButton *btnDup = new QPushButton("Duplicate Item", page);
     QPushButton *btnDel = new QPushButton("Delete Item", page);
 
-    QString style = "background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 8px; font-weight: 800; color: #3b2212;";
+    QString style = 
+        "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 10px; font-weight: 800; color: #3b2212; font-size: 11px; }"
+        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }";
     btnFront->setStyleSheet(style);
     btnBack->setStyleSheet(style);
     btnDup->setStyleSheet(style);
-    btnDel->setStyleSheet("background: #fee2e2; border: 1.5px solid #fca5a5; border-radius: 6px; padding: 8px; font-weight: 800; color: #b91c1c;");
+    btnDel->setStyleSheet(
+        "QPushButton { background: #fee2e2; border: 1.5px solid #fca5a5; border-radius: 6px; padding: 10px; font-weight: 800; color: #b91c1c; font-size: 11px; }"
+        "QPushButton:hover { background: #fecaca; border-color: #ef4444; }"
+    );
 
     connect(btnFront, &QPushButton::clicked, this, &DrawingToolboxDock::bringForwardRequested);
     connect(btnBack, &QPushButton::clicked, this, &DrawingToolboxDock::sendBackwardRequested);
@@ -373,5 +508,7 @@ QWidget *DrawingToolboxDock::createArrangePage() {
     layout->addWidget(btnDup);
     layout->addWidget(btnDel);
     layout->addStretch();
-    return page;
+
+    scroll->setWidget(page);
+    return scroll;
 }

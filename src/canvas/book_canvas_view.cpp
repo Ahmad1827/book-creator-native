@@ -67,6 +67,10 @@ void BookCanvasView::setMode(CanvasMode mode) {
     }
 }
 
+void BookCanvasView::setBrushSubtype(const QString &subtype) {
+    m_brushSubtype = subtype;
+}
+
 void BookCanvasView::setBrushColor(const QColor &color) {
     m_brushColor = color;
 }
@@ -77,6 +81,37 @@ void BookCanvasView::setBrushSize(qreal size) {
 
 void BookCanvasView::setBrushOpacity(qreal opacity) {
     m_brushOpacity = opacity;
+}
+
+void BookCanvasView::eraseAtPoint(const QPointF &scenePos) {
+    qreal r = (m_brushSize * 2.2) / 2.0;
+    QRectF eraseRect(scenePos.x() - r, scenePos.y() - r, r * 2.0, r * 2.0);
+
+    QPainterPath eraseCircle;
+    eraseCircle.addEllipse(eraseRect);
+
+    auto itemsToInspect = m_scene->items(eraseRect);
+    for (auto *item : itemsToInspect) {
+        if (item->data(1).toBool() == true) {
+            continue;
+        }
+
+        auto *pathItem = dynamic_cast<QGraphicsPathItem*>(item);
+        if (pathItem) {
+            QPainterPath itemLocalErase = pathItem->mapFromScene(eraseCircle);
+            QPainterPath currentPath = pathItem->path();
+
+            if (currentPath.intersects(itemLocalErase)) {
+                QPainterPath subtracted = currentPath.subtracted(itemLocalErase);
+                if (subtracted.isEmpty() || subtracted.length() < 1.0) {
+                    m_scene->removeItem(pathItem);
+                    delete pathItem;
+                } else {
+                    pathItem->setPath(subtracted);
+                }
+            }
+        }
+    }
 }
 
 void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
@@ -184,13 +219,36 @@ void BookCanvasView::mousePressEvent(QMouseEvent *event) {
     }
 
     if (m_mode == CanvasMode::Draw && event->button() == Qt::LeftButton) {
+        if (m_brushSubtype == "eraser") {
+            m_isDrawing = true;
+            eraseAtPoint(scenePos);
+            event->accept();
+            return;
+        }
+
         m_isDrawing = true;
         m_currentPath = QPainterPath(scenePos);
 
         QColor strokeColor = m_brushColor;
-        strokeColor.setAlphaF(m_brushOpacity);
+        qreal width = m_brushSize;
 
-        QPen pen(strokeColor, m_brushSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        if (m_brushSubtype == "watercolor") {
+            strokeColor = m_brushColor;
+            strokeColor.setAlphaF(0.35);
+            width = m_brushSize * 1.6;
+        } else if (m_brushSubtype == "marker") {
+            strokeColor = m_brushColor;
+            strokeColor.setAlphaF(0.85);
+            width = m_brushSize * 1.3;
+        } else if (m_brushSubtype == "crayon") {
+            strokeColor = m_brushColor;
+            strokeColor.setAlphaF(0.75);
+            width = m_brushSize * 1.4;
+        } else {
+            strokeColor.setAlphaF(m_brushOpacity);
+        }
+
+        QPen pen(strokeColor, width, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
         m_currentPathItem = m_scene->addPath(m_currentPath, pen);
         m_currentPathItem->setZValue(100);
         event->accept();
@@ -217,6 +275,12 @@ void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
 
     if (m_mode == CanvasMode::Draw && m_isDrawing && (event->buttons() & Qt::LeftButton)) {
         QPointF scenePos = mapToScene(event->pos());
+        if (m_brushSubtype == "eraser") {
+            eraseAtPoint(scenePos);
+            event->accept();
+            return;
+        }
+
         m_currentPath.lineTo(scenePos);
         if (m_currentPathItem) {
             m_currentPathItem->setPath(m_currentPath);
