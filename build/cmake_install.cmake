@@ -1,4 +1,4 @@
-# Install script for directory: /home/ahmad/book-creator-native
+# Install script for directory: /home/ahmad/proiecte/book-creator-native
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -50,5 +50,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/ahmad/book-creator-native/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/ahmad/proiecte/book-creator-native/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

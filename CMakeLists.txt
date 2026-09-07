@@ -20,6 +20,10 @@ add_executable(book-creator-native
     src/main.cpp
     src/models/types.h
     src/models/constants.h
+    src/canvas/book_canvas_view.h
+    src/canvas/book_canvas_view.cpp
+    src/ui/main_window.h
+    src/ui/main_window.cpp
 )
 
 target_link_libraries(book-creator-native PRIVATE
