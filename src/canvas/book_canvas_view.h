@@ -2,15 +2,14 @@
 
 #include <QGraphicsView>
 #include <QGraphicsScene>
-#include <QGraphicsPixmapItem>
+#include <QGraphicsPathItem>
 #include <QGraphicsItem>
 #include <QWheelEvent>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QMenu>
 #include <QAction>
-#include <QImage>
-#include <QPainter>
+#include <QPointF>
 #include "types.h"
 #include "constants.h"
 #include "theme_decors.h"
@@ -59,7 +58,7 @@ protected:
     void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
-    void paintStrokeSegment(const QPointF &p1, const QPointF &p2);
+    void eraseAtPoint(const QPointF &scenePos);
     void showContextMenu(const QPoint &globalPos, QGraphicsItem *item);
     void duplicateItem(QGraphicsItem *item);
     void deleteItem(QGraphicsItem *item);
@@ -75,10 +74,11 @@ private:
     qreal m_brushSize = 4.0;
     qreal m_brushOpacity = 1.0;
 
-    QImage m_rasterLayer;
-    QGraphicsPixmapItem *m_rasterPixmapItem = nullptr;
     bool m_isDrawing = false;
-    QPointF m_lastPoint;
+    QPainterPath m_currentPath;
+    QGraphicsPathItem *m_currentPathItem = nullptr;
+    QPointF m_prevPoint;
+    QPointF m_prevMidPoint;
     QString m_activeSide = "left";
 
     bool m_isMiddlePanning = false;
