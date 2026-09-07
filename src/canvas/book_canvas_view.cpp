@@ -26,6 +26,18 @@ BookCanvasView::BookCanvasView(QWidget *parent)
     setMode(CanvasMode::Draw);
 }
 
+void BookCanvasView::resizeEvent(QResizeEvent *event) {
+    QGraphicsView::resizeEvent(event);
+    if (!m_initialFitDone && width() > 100 && height() > 100) {
+        fitBookInView();
+        m_initialFitDone = true;
+    }
+}
+
+void BookCanvasView::fitBookInView() {
+    fitInView(QRectF(-60, -40, 1320, 730), Qt::KeepAspectRatio);
+}
+
 void BookCanvasView::setTheme(const BookTheme &theme) {
     m_theme = theme;
     m_brushColor = theme.inkColor;
@@ -72,7 +84,7 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 
     painter->save();
 
-    QRectF deskRect = m_scene->sceneRect().adjusted(-800, -800, 800, 800);
+    QRectF deskRect = m_scene->sceneRect().adjusted(-1600, -1600, 1600, 1600);
     QLinearGradient deskGrad(deskRect.topLeft(), deskRect.bottomLeft());
     deskGrad.setColorAt(0.0, QColor("#442617"));
     deskGrad.setColorAt(0.5, QColor("#351c0f"));
@@ -133,7 +145,33 @@ void BookCanvasView::wheelEvent(QWheelEvent *event) {
     event->accept();
 }
 
+void BookCanvasView::keyPressEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        m_spacePressed = true;
+        setCursor(Qt::OpenHandCursor);
+    }
+    QGraphicsView::keyPressEvent(event);
+}
+
+void BookCanvasView::keyReleaseEvent(QKeyEvent *event) {
+    if (event->key() == Qt::Key_Space && !event->isAutoRepeat()) {
+        m_spacePressed = false;
+        m_isSpacePanning = false;
+        unsetCursor();
+    }
+    QGraphicsView::keyReleaseEvent(event);
+}
+
 void BookCanvasView::mousePressEvent(QMouseEvent *event) {
+    if (event->button() == Qt::MiddleButton || (event->button() == Qt::LeftButton && m_spacePressed)) {
+        if (event->button() == Qt::MiddleButton) m_isMiddlePanning = true;
+        else m_isSpacePanning = true;
+        m_lastPanPoint = event->pos();
+        setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
+
     QPointF scenePos = mapToScene(event->pos());
     m_activeSide = scenePos.x() < 600 ? "left" : "right";
     emit activeSideChanged(m_activeSide);
@@ -168,6 +206,15 @@ void BookCanvasView::mousePressEvent(QMouseEvent *event) {
 }
 
 void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
+    if (m_isMiddlePanning || m_isSpacePanning) {
+        QPoint delta = event->pos() - m_lastPanPoint;
+        m_lastPanPoint = event->pos();
+        horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
+        verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+        event->accept();
+        return;
+    }
+
     if (m_mode == CanvasMode::Draw && m_isDrawing && (event->buttons() & Qt::LeftButton)) {
         QPointF scenePos = mapToScene(event->pos());
         m_currentPath.lineTo(scenePos);
@@ -182,6 +229,20 @@ void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void BookCanvasView::mouseReleaseEvent(QMouseEvent *event) {
+    if (event->button() == Qt::MiddleButton && m_isMiddlePanning) {
+        m_isMiddlePanning = false;
+        unsetCursor();
+        event->accept();
+        return;
+    }
+
+    if (event->button() == Qt::LeftButton && m_isSpacePanning) {
+        m_isSpacePanning = false;
+        setCursor(m_spacePressed ? Qt::OpenHandCursor : Qt::ArrowCursor);
+        event->accept();
+        return;
+    }
+
     if (m_mode == CanvasMode::Draw && event->button() == Qt::LeftButton && m_isDrawing) {
         m_isDrawing = false;
         m_currentPathItem = nullptr;
@@ -219,10 +280,9 @@ void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *ite
         connect(actLock, &QAction::triggered, [this, item]() { toggleLockItem(item); });
         connect(actDel, &QAction::triggered, [this, item]() { deleteItem(item); });
     } else {
-        QAction *actResetZoom = menu.addAction("Reset View (100%)");
+        QAction *actResetZoom = menu.addAction("Reset View (Fit Book)");
         connect(actResetZoom, &QAction::triggered, [this]() {
-            resetTransform();
-            centerOn(600, 325);
+            fitBookInView();
         });
     }
 
@@ -352,11 +412,11 @@ void BookCanvasView::addStorySticker(const QString &stickerId, const QString &sv
     qreal posX = (m_activeSide == "left") ? 250.0 : 850.0;
     qreal posY = 220.0;
 
-    QString fullSvg = QString(R"(
-        <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <path d="%1" fill="%2" stroke="#2c211a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-    )").arg(svgPath, fill.name());
+    QString fullSvg = QString(
+        "<svg viewBox=\"0 0 100 100\" xmlns=\"http://www.w3.org/2000/svg\">"
+        "<path d=\"%1\" fill=\"%2\" stroke=\"#2c211a\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" />"
+        "</svg>"
+    ).arg(svgPath, fill.name());
 
     QSvgRenderer renderer(fullSvg.toUtf8());
     QImage image(100, 100, QImage::Format_ARGB32_Premultiplied);

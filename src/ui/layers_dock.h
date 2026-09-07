@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QWidget>
+#include <QFrame>
 #include <QListWidget>
 #include <QStackedWidget>
 #include <QPushButton>
@@ -18,6 +19,7 @@ public:
     void setLayers(const QList<CanvasLayer> &layers, const QString &activeLayerId);
     void setPageNumbers(int leftNum, int rightNum);
     QString activeSide() const;
+    void toggleOpen();
 
 signals:
     void applyTemplateRequested(const QString &side, const QString &templateType);
@@ -35,6 +37,10 @@ private:
     QWidget *createTemplatesTab();
     QWidget *createLayersTab();
     void refreshLayersList();
+
+    QPushButton *m_handleBtn;
+    QFrame *m_contentFrame;
+    bool m_isOpen = true;
 
     QStackedWidget *m_tabStack;
     QPushButton *m_tabBtnTemplates;

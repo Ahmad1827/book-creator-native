@@ -44,3 +44,14 @@
 558	9748	1788797548286060447	CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o	448bba87826f5db2
 542	10050	1788797548591147489	CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o	b91d39f3d57d0651
 10050	10834	1788797549368349077	book-creator-native	f97c1af5f17a0acf
+5	615	1788798071266590547	book-creator-native_autogen/timestamp	7abf432f3ccee7c0
+5	615	1788798071266590547	book-creator-native_autogen/mocs_compilation.cpp	7abf432f3ccee7c0
+5	615	1788798071266590547	/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/timestamp	7abf432f3ccee7c0
+5	615	1788798071266590547	/home/ahmad/proiecte/book-creator-native/build/book-creator-native_autogen/mocs_compilation.cpp	7abf432f3ccee7c0
+615	10396	1788798081060140658	CMakeFiles/book-creator-native.dir/src/canvas/book_canvas_view.cpp.o	85b886462b9821ca
+615	10581	1788798081244518767	CMakeFiles/book-creator-native.dir/src/main.cpp.o	f57261cb29ba8bef
+616	11269	1788798081748307266	CMakeFiles/book-creator-native.dir/src/ui/layers_dock.cpp.o	fc428031e59d7b5e
+615	11460	1788798082127260005	CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o	b91d39f3d57d0651
+616	11520	1788798082182287754	CMakeFiles/book-creator-native.dir/src/ui/drawing_toolbox_dock.cpp.o	4690e005aaaa2a17
+618	12710	1788798083375981138	CMakeFiles/book-creator-native.dir/src/ui/main_window.cpp.o	448bba87826f5db2
+12710	13406	1788798084070420910	book-creator-native	f97c1af5f17a0acf

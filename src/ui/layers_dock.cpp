@@ -7,26 +7,46 @@ LayersDock::LayersDock(QWidget *parent)
 }
 
 void LayersDock::setupUi() {
-    setFixedWidth(300);
-    setStyleSheet(
-        "QWidget { background: #fbf5ea; color: #3b2212; font-family: sans-serif; }"
+    QHBoxLayout *rootLayout = new QHBoxLayout(this);
+    rootLayout->setContentsMargins(0, 0, 0, 0);
+    rootLayout->setSpacing(0);
+
+    m_handleBtn = new QPushButton(this);
+    m_handleBtn->setFixedWidth(36);
+    m_handleBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    m_handleBtn->setText("▶\n\nL\nA\nY\nE\nR\nS");
+    m_handleBtn->setStyleSheet(
+        "QPushButton { background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2b170c, stop:1 #381f13); "
+        "border-left: 2px solid #1c0e07; border-top: none; border-bottom: none; border-right: none; "
+        "color: #dfbe87; font-weight: 800; font-size: 10px; line-height: 14px; padding: 8px 0; } "
+        "QPushButton:hover { color: #ffffff; background: #442617; }"
+    );
+    m_handleBtn->setToolTip("Toggle Layout & Layers Panel");
+    connect(m_handleBtn, &QPushButton::clicked, this, &LayersDock::toggleOpen);
+    rootLayout->addWidget(m_handleBtn);
+
+    m_contentFrame = new QFrame(this);
+    m_contentFrame->setFixedWidth(280);
+    m_contentFrame->setStyleSheet(
+        "QFrame { background: #fbf5ea; border-left: 3px solid #8d6b4f; color: #3b2212; }"
         "QListWidget { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 8px; }"
         "QListWidget::item { border-bottom: 1px solid #ebd9c3; padding: 6px; }"
         "QListWidget::item:selected { background: #ecd9bf; }"
     );
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(10, 10, 10, 10);
-    mainLayout->setSpacing(10);
+    QVBoxLayout *contentLayout = new QVBoxLayout(m_contentFrame);
+    contentLayout->setContentsMargins(10, 10, 10, 10);
+    contentLayout->setSpacing(10);
 
+    QHBoxLayout *topRow = new QHBoxLayout();
     QHBoxLayout *tabSwitcher = new QHBoxLayout();
     tabSwitcher->setSpacing(4);
 
-    m_tabBtnTemplates = new QPushButton("Page Templates", this);
-    m_tabBtnLayers = new QPushButton("Layers (1)", this);
+    m_tabBtnTemplates = new QPushButton("Page Templates", m_contentFrame);
+    m_tabBtnLayers = new QPushButton("Layers (1)", m_contentFrame);
 
-    QString tabStyleActive = "background: #3b2212; color: #fbf5ea; border-radius: 6px; padding: 6px; font-weight: 800;";
-    QString tabStyleInactive = "background: #e6d3ba; color: #5c351f; border-radius: 6px; padding: 6px; font-weight: 800;";
+    QString tabStyleActive = "background: #3b2212; color: #fbf5ea; border-radius: 6px; padding: 6px 10px; font-weight: 800; font-size: 11px;";
+    QString tabStyleInactive = "background: #e6d3ba; color: #5c351f; border-radius: 6px; padding: 6px 10px; font-weight: 800; font-size: 11px;";
 
     m_tabBtnTemplates->setStyleSheet(tabStyleActive);
     m_tabBtnLayers->setStyleSheet(tabStyleInactive);
@@ -45,20 +65,36 @@ void LayersDock::setupUi() {
 
     tabSwitcher->addWidget(m_tabBtnTemplates);
     tabSwitcher->addWidget(m_tabBtnLayers);
-    mainLayout->addLayout(tabSwitcher);
 
-    m_tabStack = new QStackedWidget(this);
+    QPushButton *btnClose = new QPushButton("✕", m_contentFrame);
+    btnClose->setFixedSize(22, 22);
+    btnClose->setStyleSheet("background: transparent; border: none; font-size: 13px; font-weight: bold; color: #7a5c43;");
+    connect(btnClose, &QPushButton::clicked, this, &LayersDock::toggleOpen);
+
+    topRow->addLayout(tabSwitcher);
+    topRow->addStretch();
+    topRow->addWidget(btnClose);
+    contentLayout->addLayout(topRow);
+
+    m_tabStack = new QStackedWidget(m_contentFrame);
     m_tabStack->addWidget(createTemplatesTab());
     m_tabStack->addWidget(createLayersTab());
 
-    mainLayout->addWidget(m_tabStack);
+    contentLayout->addWidget(m_tabStack);
+    rootLayout->addWidget(m_contentFrame);
+}
+
+void LayersDock::toggleOpen() {
+    m_isOpen = !m_isOpen;
+    m_contentFrame->setVisible(m_isOpen);
+    m_handleBtn->setText(m_isOpen ? "▶\n\nL\nA\nY\nE\nR\nS" : "◀\n\nL\nA\nY\nE\nR\nS");
 }
 
 QWidget *LayersDock::createTemplatesTab() {
     QWidget *tab = new QWidget(this);
     QVBoxLayout *layout = new QVBoxLayout(tab);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(12);
+    layout->setSpacing(10);
 
     QLabel *lblTarget = new QLabel("APPLY TEMPLATE TO", tab);
     lblTarget->setStyleSheet("font-size: 10px; font-weight: 800; color: #7a5c43;");
@@ -68,8 +104,8 @@ QWidget *LayersDock::createTemplatesTab() {
     m_btnSideLeft = new QPushButton("Page 1 (Left)", tab);
     m_btnSideRight = new QPushButton("Page 2 (Right)", tab);
 
-    QString activeSideStyle = "background: #3b2212; color: #fbf5ea; border-radius: 6px; padding: 6px; font-weight: 800;";
-    QString inactiveSideStyle = "background: #f3e9d8; color: #3b2212; border: 1.5px solid #d4be9f; border-radius: 6px; padding: 6px; font-weight: 800;";
+    QString activeSideStyle = "background: #3b2212; color: #fbf5ea; border-radius: 6px; padding: 6px; font-weight: 800; font-size: 11px;";
+    QString inactiveSideStyle = "background: #f3e9d8; color: #3b2212; border: 1.5px solid #d4be9f; border-radius: 6px; padding: 6px; font-weight: 800; font-size: 11px;";
 
     m_btnSideLeft->setStyleSheet(activeSideStyle);
     m_btnSideRight->setStyleSheet(inactiveSideStyle);

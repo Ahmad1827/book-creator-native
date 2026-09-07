@@ -6,6 +6,7 @@
 #include <QGraphicsItem>
 #include <QWheelEvent>
 #include <QMouseEvent>
+#include <QKeyEvent>
 #include <QMenu>
 #include <QAction>
 #include "types.h"
@@ -38,17 +39,21 @@ public:
     void deleteSelectedItem();
     void bringSelectedItemToFront();
     void sendSelectedItemToBack();
+    void fitBookInView();
 
 signals:
     void activeSideChanged(const QString &side);
     void selectionChanged(QGraphicsItem *item);
 
 protected:
+    void resizeEvent(QResizeEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
 
 private:
     void showContextMenu(const QPoint &globalPos, QGraphicsItem *item);
@@ -64,8 +69,15 @@ private:
     QColor m_brushColor = QColor("#1d291e");
     qreal m_brushSize = 4.0;
     qreal m_brushOpacity = 1.0;
+
     bool m_isDrawing = false;
     QPainterPath m_currentPath;
     QGraphicsPathItem *m_currentPathItem = nullptr;
     QString m_activeSide = "left";
+
+    bool m_isMiddlePanning = false;
+    bool m_isSpacePanning = false;
+    bool m_spacePressed = false;
+    QPoint m_lastPanPoint;
+    bool m_initialFitDone = false;
 };

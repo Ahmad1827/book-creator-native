@@ -11,6 +11,7 @@
 #include <QGridLayout>
 #include <QButtonGroup>
 #include <QColorDialog>
+#include <QIcon>
 #include "types.h"
 #include "constants.h"
 
@@ -37,6 +38,7 @@ private:
     void setupUi();
     void buildIconRail();
     void buildDrawerPages();
+    QIcon createSvgIcon(const QString &pathD, const QString &fillColor = "#5c351f");
 
     QWidget *createPencilPage();
     QWidget *createBrushPage();
@@ -59,4 +61,5 @@ private:
     qreal m_shapeStrokeWidth = 2.0;
 
     bool m_isDrawerOpen = false;
+    QButtonGroup *m_railGroup;
 };
