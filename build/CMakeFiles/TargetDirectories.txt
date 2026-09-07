@@ -1,0 +1,5 @@
+/home/ahmad/book-creator-native/build/CMakeFiles/book-creator-native.dir
+/home/ahmad/book-creator-native/build/CMakeFiles/edit_cache.dir
+/home/ahmad/book-creator-native/build/CMakeFiles/rebuild_cache.dir
+/home/ahmad/book-creator-native/build/CMakeFiles/book-creator-native_autogen_timestamp_deps.dir
+/home/ahmad/book-creator-native/build/CMakeFiles/book-creator-native_autogen.dir

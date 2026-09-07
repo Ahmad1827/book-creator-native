@@ -1,0 +1,15 @@
+# ninja log v5
+48	2690	1788772415483629563	CMakeFiles/book-creator-native.dir/src/main.cpp.o	68daf2c34f78a415
+47	64	1788772412861277767	CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o	783c813a7436d875
+1	47	1788772412831627951	/home/ahmad/book-creator-native/build/book-creator-native_autogen/mocs_compilation.cpp	80831839fa06f822
+2691	3402	1788772416196348839	book-creator-native	c923a6cc191853b0
+1	47	1788772412831627951	/home/ahmad/book-creator-native/build/book-creator-native_autogen/timestamp	80831839fa06f822
+1	47	1788772412831627951	book-creator-native_autogen/mocs_compilation.cpp	80831839fa06f822
+1	47	1788772412831627951	book-creator-native_autogen/timestamp	80831839fa06f822
+4	58	1788772535094922010	book-creator-native_autogen/timestamp	80831839fa06f822
+4	58	1788772535094922010	book-creator-native_autogen/mocs_compilation.cpp	80831839fa06f822
+4	58	1788772535094922010	/home/ahmad/book-creator-native/build/book-creator-native_autogen/timestamp	80831839fa06f822
+4	58	1788772535094922010	/home/ahmad/book-creator-native/build/book-creator-native_autogen/mocs_compilation.cpp	80831839fa06f822
+59	78	1788772535116021122	CMakeFiles/book-creator-native.dir/book-creator-native_autogen/mocs_compilation.cpp.o	d913344530f38bec
+60	2792	1788772537513090443	CMakeFiles/book-creator-native.dir/src/main.cpp.o	3a27b1503b992b50
+2792	3305	1788772538340941013	book-creator-native	c923a6cc191853b0
