@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QTimer>
 #include "types.h"
 #include "constants.h"
 #include "book_canvas_view.h"
@@ -20,12 +21,19 @@ class MainWindow : public QMainWindow {
 public:
     explicit MainWindow(QWidget *parent = nullptr);
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
 private:
     void setupUi();
     void setupEditorTopBar(QVBoxLayout *layout);
     void setupEditorBottomBar(QVBoxLayout *layout);
     void updateNavigationState();
     void openProject(const BookProject &proj);
+    void switchToSpread(int index);
+    void commitCanvas();
+    bool isEditorOpen() const;
+    void scheduleAutosave();
     void loadProjectsFromDisk();
     void saveProjectsToDisk();
     void exportPdf();
@@ -48,4 +56,9 @@ private:
     QPushButton *m_btnNextSpread;
     QHBoxLayout *m_chipsLayout;
     QWidget *m_chipsContainer;
+    QComboBox *m_comboThemes;
+    QLabel *m_lblSaveState;
+    QPushButton *m_btnUndo;
+    QPushButton *m_btnRedo;
+    QTimer *m_autosaveTimer;
 };

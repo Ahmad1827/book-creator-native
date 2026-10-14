@@ -30,6 +30,10 @@ signals:
     void brushOpacitySelected(qreal opacity);
     void shapeAdded(const QString &shapeType, const QColor &fill, const QColor &stroke, qreal strokeWidth);
     void stickerAdded(const QString &stickerId, const QString &svgPath, const QColor &fill);
+    void textFontSelected(const QString &family);
+    void textSizeSelected(int pixelSize);
+    void textColorSelected(const QColor &color);
+    void textAlignmentSelected(Qt::Alignment align);
     void bringForwardRequested();
     void sendBackwardRequested();
     void duplicateRequested();
@@ -48,6 +52,7 @@ private:
     QWidget *createShapesPage();
     QWidget *createStickersPage();
     QWidget *createArrangePage();
+    QWidget *createTextPage();
 
     QWidget *m_iconRail;
     QFrame *m_drawer;
@@ -69,4 +74,6 @@ private:
     QButtonGroup *m_leadGroup;
     QList<QPushButton*> m_colorSwatches;
     QList<QPushButton*> m_fillSwatches;
+    QList<QPushButton*> m_textSwatches;
+    QColor m_currentTextColor = QColor("#2c211a");
 };

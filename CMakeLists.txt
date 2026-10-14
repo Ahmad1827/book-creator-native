@@ -23,6 +23,8 @@ add_executable(book-creator-native
     src/models/constants.h
     src/canvas/theme_decors.h
     src/canvas/theme_decors.cpp
+    src/canvas/canvas_items.h
+    src/canvas/canvas_items.cpp
     src/canvas/book_canvas_view.h
     src/canvas/book_canvas_view.cpp
     src/ui/drawing_toolbox_dock.h
@@ -37,6 +39,7 @@ add_executable(book-creator-native
     src/ui/main_window.cpp
     src/utils/pdf_exporter.h
     src/utils/pdf_exporter.cpp
+    assets/resources.qrc
 )
 
 target_link_libraries(book-creator-native PRIVATE

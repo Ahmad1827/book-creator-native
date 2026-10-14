@@ -1,0 +1,20 @@
+<RCC>
+    <qresource prefix="/">
+        <file>fonts/AmaticSC-Regular.ttf</file>
+        <file>fonts/ArchitectsDaughter-Regular.ttf</file>
+        <file>fonts/Baloo2.ttf</file>
+        <file>fonts/Caveat.ttf</file>
+        <file>fonts/Chewy-Regular.ttf</file>
+        <file>fonts/Comfortaa.ttf</file>
+        <file>fonts/DynaPuff.ttf</file>
+        <file>fonts/Fredoka.ttf</file>
+        <file>fonts/Gaegu-Regular.ttf</file>
+        <file>fonts/IndieFlower-Regular.ttf</file>
+        <file>fonts/Kalam-Regular.ttf</file>
+        <file>fonts/Lora.ttf</file>
+        <file>fonts/Pangolin-Regular.ttf</file>
+        <file>fonts/PatrickHand-Regular.ttf</file>
+        <file>fonts/Quicksand.ttf</file>
+        <file>fonts/Sniglet-Regular.ttf</file>
+    </qresource>
+</RCC>

@@ -1,5 +1,6 @@
 #include "drawing_toolbox_dock.h"
 #include <QScrollArea>
+#include <QListWidget>
 #include <QSvgRenderer>
 #include <QPainter>
 
@@ -110,6 +111,9 @@ void DrawingToolboxDock::buildIconRail() {
         m_railGroup->addButton(btn);
 
         connect(btn, &QPushButton::clicked, [this, pageIdx, toolId, title]() {
+            // The pencil and the brush drawer share one canvas brush, so re-assert which one is in hand.
+            if (toolId == "pencil") emit brushSubtypeSelected("pencil");
+            else if (toolId == "brush") emit brushSubtypeSelected(m_selectedSubtype);
             emit toolSelected(toolId);
             if (pageIdx >= 0) {
                 m_drawerTitle->setText(title);
@@ -127,6 +131,7 @@ void DrawingToolboxDock::buildIconRail() {
     createRailButton("M4 2l6 17 3-5 5 7 2-1-5-7 7-2z", -1, "select", "Select Tool", "Select & Move Item (V)");
     auto *btnDraw = createRailButton("M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z", 0, "pencil", "Sketchbook Lead", "Sketch Pencil (P)");
     createRailButton("M7 14c-1.66 0-3 1.34-3 3 0 1.31-1.16 2-2 2 .92 1.22 2.49 2 4 2 2.21 0 4-1.79 4-4 0-1.66-1.34-3-3-3zm13.71-9.71a1 1 0 0 0-1.42 0l-9.05 9.06 2.83 2.83 9.06-9.06a1 1 0 0 0 0-1.41l-1.42-1.42z", 1, "brush", "Brushes & Eraser", "Brushes & Eraser (B)");
+    createRailButton("M5 4v3h5.5v12h3V7H19V4z", 6, "text", "Story Text", "Write Story Text");
     createRailButton("M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19A1 1 0 0 0 5.2 20.5c1.88 0 3.32-.97 4.14-2.07.82.37 1.73.57 2.66.57 4.97 0 9-4.03 9-9s-4.03-9-9-9zm-5.5 8c-.83 0-1.5-.67-1.5-1.5S5.67 8 6.5 8s1.5.67 1.5 1.5S7.33 11 6.5 11zm3-4c-.83 0-1.5-.67-1.5-1.5S8.67 4 9.5 4s1.5.67 1.5 1.5S10.33 7 9.5 7zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 4 14.5 4s1.5.67 1.5 1.5S15.33 7 14.5 7zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 8 17.5 8s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z", 2, "palette", "Color Studio", "Color Studio");
     createRailButton("M12 2l4.5 9h-9zM3 13.5h7v7H3zm11 0a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", 3, "shapes", "Storybook Geometry", "Story Shapes");
     createRailButton("M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z", 4, "stickers", "Story Stamps", "Vector Stamps");
@@ -145,6 +150,7 @@ void DrawingToolboxDock::buildDrawerPages() {
     m_stackedDrawer->addWidget(createShapesPage());
     m_stackedDrawer->addWidget(createStickersPage());
     m_stackedDrawer->addWidget(createArrangePage());
+    m_stackedDrawer->addWidget(createTextPage());
 }
 
 QWidget *DrawingToolboxDock::createPencilPage() {
@@ -507,6 +513,144 @@ QWidget *DrawingToolboxDock::createArrangePage() {
     layout->addWidget(btnBack);
     layout->addWidget(btnDup);
     layout->addWidget(btnDel);
+    layout->addStretch();
+
+    scroll->setWidget(page);
+    return scroll;
+}
+QWidget *DrawingToolboxDock::createTextPage() {
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+    QWidget *page = new QWidget(scroll);
+    QVBoxLayout *layout = new QVBoxLayout(page);
+    layout->setContentsMargins(4, 4, 10, 4);
+    layout->setSpacing(8);
+
+    const QString sectionStyle = "font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px; margin-top: 4px;";
+
+    QLabel *lblHint = new QLabel("Click on a page to start writing. Click a text box to edit it, or use the Select tool to move it.", page);
+    lblHint->setWordWrap(true);
+    lblHint->setStyleSheet("font-size: 11px; font-weight: 600; color: #6b4a33; background: #f3e9d8; border: 1px solid #e0cfb4; border-radius: 6px; padding: 8px;");
+    layout->addWidget(lblHint);
+
+    QLabel *lblFont = new QLabel("STORY FONT", page);
+    lblFont->setStyleSheet(sectionStyle);
+    layout->addWidget(lblFont);
+
+    QListWidget *fontList = new QListWidget(page);
+    fontList->setMinimumHeight(260);
+    fontList->setStyleSheet(
+        "QListWidget { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 8px; padding: 4px; color: #3b2212; }"
+        "QListWidget::item { padding: 4px 8px; border-radius: 6px; }"
+        "QListWidget::item:hover { background: #f3e9d8; }"
+        "QListWidget::item:selected { background: #ecd9bf; color: #1a0d06; }"
+    );
+    for (const auto &font : FONTS) {
+        auto *item = new QListWidgetItem(font.name, fontList);
+        QFont preview(font.name);
+        preview.setPixelSize(20);
+        item->setFont(preview);
+        item->setToolTip(font.category);
+        if (font.name == "Patrick Hand") fontList->setCurrentItem(item);
+    }
+    connect(fontList, &QListWidget::currentTextChanged, this, [this](const QString &family) {
+        if (!family.isEmpty()) emit textFontSelected(family);
+    });
+    layout->addWidget(fontList);
+
+    QLabel *lblSize = new QLabel("TEXT SIZE", page);
+    lblSize->setStyleSheet(sectionStyle);
+    layout->addWidget(lblSize);
+
+    QHBoxLayout *sizeRow = new QHBoxLayout();
+    QSlider *sliderSize = new QSlider(Qt::Horizontal, page);
+    sliderSize->setRange(12, 96);
+    sliderSize->setValue(28);
+    QLabel *lblSizeValue = new QLabel("28", page);
+    lblSizeValue->setFixedWidth(28);
+    connect(sliderSize, &QSlider::valueChanged, this, [this, lblSizeValue](int val) {
+        lblSizeValue->setText(QString::number(val));
+        emit textSizeSelected(val);
+    });
+    sizeRow->addWidget(sliderSize, 1);
+    sizeRow->addWidget(lblSizeValue);
+    layout->addLayout(sizeRow);
+
+    QLabel *lblAlign = new QLabel("ALIGNMENT", page);
+    lblAlign->setStyleSheet(sectionStyle);
+    layout->addWidget(lblAlign);
+
+    QHBoxLayout *alignRow = new QHBoxLayout();
+    alignRow->setSpacing(6);
+    QButtonGroup *alignGroup = new QButtonGroup(page);
+    alignGroup->setExclusive(true);
+    struct AlignEntry { QString label; Qt::Alignment align; };
+    const QList<AlignEntry> aligns = {
+        {"Left", Qt::AlignLeft},
+        {"Center", Qt::AlignHCenter},
+        {"Right", Qt::AlignRight}
+    };
+    for (const auto &a : aligns) {
+        QPushButton *btn = new QPushButton(a.label, page);
+        btn->setCheckable(true);
+        btn->setStyleSheet(
+            "QPushButton { background: #f3e9d8; border: 1.5px solid #d4be9f; border-radius: 6px; padding: 7px 0; font-weight: 800; color: #3b2212; }"
+            "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+            "QPushButton:checked { background: #3b2212; color: #fbf5ea; border-color: #3b2212; }"
+        );
+        alignGroup->addButton(btn);
+        connect(btn, &QPushButton::clicked, this, [this, a]() {
+            emit textAlignmentSelected(a.align);
+        });
+        alignRow->addWidget(btn);
+        if (a.align == Qt::AlignLeft) btn->setChecked(true);
+    }
+    layout->addLayout(alignRow);
+
+    QLabel *lblColor = new QLabel("INK COLOUR", page);
+    lblColor->setStyleSheet(sectionStyle);
+    layout->addWidget(lblColor);
+
+    QHBoxLayout *colorRow = new QHBoxLayout();
+    colorRow->setSpacing(6);
+    const QStringList textColors = {"#2c211a", "#3d5a80", "#e07a5f", "#606c38", "#847596", "#b48448", "#ffffff"};
+    for (const auto &hex : textColors) {
+        QPushButton *swatch = new QPushButton(page);
+        swatch->setCheckable(true);
+        swatch->setFixedSize(26, 26);
+        swatch->setStyleSheet(QString(
+            "QPushButton { background: %1; border: 2px solid #bda383; border-radius: 13px; }"
+            "QPushButton:hover { border-color: #8b5b32; border-width: 2.5px; }"
+            "QPushButton:checked { border: 3px solid #3b2212; }"
+        ).arg(hex));
+        m_textSwatches.append(swatch);
+        connect(swatch, &QPushButton::clicked, this, [this, hex, swatch]() {
+            for (auto *s : m_textSwatches) s->setChecked(s == swatch);
+            m_currentTextColor = QColor(hex);
+            emit textColorSelected(m_currentTextColor);
+        });
+        colorRow->addWidget(swatch);
+    }
+    colorRow->addStretch();
+    layout->addLayout(colorRow);
+
+    QPushButton *btnPick = new QPushButton("Pick Custom Colour", page);
+    btnPick->setStyleSheet(
+        "QPushButton { background: #f3e9d8; border: 1.5px solid #bda383; border-radius: 6px; padding: 8px 12px; font-weight: 800; color: #3b2212; }"
+        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+    );
+    connect(btnPick, &QPushButton::clicked, this, [this]() {
+        QColor col = QColorDialog::getColor(m_currentTextColor, this, "Text Colour");
+        if (col.isValid()) {
+            m_currentTextColor = col;
+            for (auto *s : m_textSwatches) s->setChecked(false);
+            emit textColorSelected(col);
+        }
+    });
+    layout->addWidget(btnPick);
     layout->addStretch();
 
     scroll->setWidget(page);

@@ -6,6 +6,10 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
+#include <QCloseEvent>
+#include <QAction>
+#include <QSignalBlocker>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -19,8 +23,53 @@ MainWindow::MainWindow(QWidget *parent)
     setWindowTitle("book-creator-native");
     resize(1440, 900);
 
+    m_autosaveTimer = new QTimer(this);
+    m_autosaveTimer->setSingleShot(true);
+    m_autosaveTimer->setInterval(1500);
+    connect(m_autosaveTimer, &QTimer::timeout, this, [this]() {
+        // Saving ends text editing, so wait until she has finished typing.
+        if (isEditorOpen() && m_canvasView->isEditingText()) {
+            m_autosaveTimer->start();
+            return;
+        }
+        saveProjectsToDisk();
+    });
+
     setupUi();
     loadProjectsFromDisk();
+
+    connect(m_canvasView, &BookCanvasView::contentChanged, this, &MainWindow::scheduleAutosave);
+
+    QAction *actUndo = new QAction("Undo", this);
+    actUndo->setShortcuts({QKeySequence::Undo});
+    connect(actUndo, &QAction::triggered, this, [this]() {
+        if (isEditorOpen()) m_canvasView->undo();
+    });
+    addAction(actUndo);
+
+    QAction *actRedo = new QAction("Redo", this);
+    actRedo->setShortcuts({QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Z), QKeySequence(Qt::CTRL | Qt::Key_Y)});
+    connect(actRedo, &QAction::triggered, this, [this]() {
+        if (isEditorOpen()) m_canvasView->redo();
+    });
+    addAction(actRedo);
+
+    QAction *actSave = new QAction("Save", this);
+    actSave->setShortcut(QKeySequence::Save);
+    connect(actSave, &QAction::triggered, this, [this]() {
+        if (isEditorOpen()) saveProjectsToDisk();
+    });
+    addAction(actSave);
+
+    QUndoGroup *undoGroup = m_canvasView->undoGroup();
+    connect(undoGroup, &QUndoGroup::canUndoChanged, m_btnUndo, &QPushButton::setEnabled);
+    connect(undoGroup, &QUndoGroup::canRedoChanged, m_btnRedo, &QPushButton::setEnabled);
+    connect(undoGroup, &QUndoGroup::undoTextChanged, this, [this](const QString &text) {
+        m_btnUndo->setToolTip(text.isEmpty() ? "Undo (Ctrl+Z)" : QString("Undo %1 (Ctrl+Z)").arg(text.toLower()));
+    });
+    connect(undoGroup, &QUndoGroup::redoTextChanged, this, [this](const QString &text) {
+        m_btnRedo->setToolTip(text.isEmpty() ? "Redo (Ctrl+Shift+Z)" : QString("Redo %1 (Ctrl+Shift+Z)").arg(text.toLower()));
+    });
 
     connect(m_bookshelfView, &BookshelfView::openProjectRequested, this, &MainWindow::openProject);
 
@@ -88,6 +137,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_toolboxDock, &DrawingToolboxDock::toolSelected, this, [this](const QString &toolId) {
         if (toolId == "select") m_canvasView->setMode(CanvasMode::Select);
         else if (toolId == "pan") m_canvasView->setMode(CanvasMode::Pan);
+        else if (toolId == "text") m_canvasView->setMode(CanvasMode::Text);
         else m_canvasView->setMode(CanvasMode::Draw);
     });
 
@@ -101,6 +151,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_toolboxDock, &DrawingToolboxDock::bringForwardRequested, m_canvasView, &BookCanvasView::bringSelectedItemToFront);
     connect(m_toolboxDock, &DrawingToolboxDock::sendBackwardRequested, m_canvasView, &BookCanvasView::sendSelectedItemToBack);
     connect(m_toolboxDock, &DrawingToolboxDock::brushSubtypeSelected, m_canvasView, &BookCanvasView::setBrushSubtype);
+    connect(m_toolboxDock, &DrawingToolboxDock::textFontSelected, m_canvasView, &BookCanvasView::setTextFontFamily);
+    connect(m_toolboxDock, &DrawingToolboxDock::textSizeSelected, m_canvasView, &BookCanvasView::setTextPixelSize);
+    connect(m_toolboxDock, &DrawingToolboxDock::textColorSelected, m_canvasView, &BookCanvasView::setTextColor);
+    connect(m_toolboxDock, &DrawingToolboxDock::textAlignmentSelected, m_canvasView, &BookCanvasView::setTextAlignment);
     connect(m_layersDock, &LayersDock::applyTemplateRequested, m_canvasView, &BookCanvasView::applyPageTemplate);
 
     connect(m_layersDock, &LayersDock::addLayerRequested, [this]() {
@@ -199,6 +253,7 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
         "QComboBox { background: #fbf5ea; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 4px 10px; font-weight: bold; color: #3b2212; }"
         "QPushButton { background: #fbf5ea; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 6px 14px; font-weight: bold; color: #3b2212; }"
         "QPushButton:hover { background: #ffffff; }"
+        "QPushButton:disabled { background: #6b4a33; color: #a88a6c; border-color: #5a351f; }"
     );
 
     QHBoxLayout *topLayout = new QHBoxLayout(topBar);
@@ -216,19 +271,35 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
     m_lblTitle = new QLabel(topBar);
     topLayout->addWidget(m_lblTitle);
 
-    QComboBox *comboThemes = new QComboBox(topBar);
+    m_comboThemes = new QComboBox(topBar);
     for (const auto &theme : THEMES) {
-        comboThemes->addItem(theme.name, theme.id);
+        m_comboThemes->addItem(theme.name, theme.id);
     }
-    connect(comboThemes, &QComboBox::currentIndexChanged, [this, comboThemes](int index) {
-        QString id = comboThemes->itemData(index).toString();
+    connect(m_comboThemes, &QComboBox::currentIndexChanged, [this](int index) {
+        QString id = m_comboThemes->itemData(index).toString();
         m_activeProject.themeId = id;
         m_canvasView->setTheme(getThemeById(id));
         saveProjectsToDisk();
     });
-    topLayout->addWidget(comboThemes);
+    topLayout->addWidget(m_comboThemes);
 
     topLayout->addStretch();
+
+    m_lblSaveState = new QLabel(topBar);
+    m_lblSaveState->setStyleSheet("color: #dfbe87; font-weight: 700; font-size: 11px; border: none; background: transparent;");
+    topLayout->addWidget(m_lblSaveState);
+
+    m_btnUndo = new QPushButton("↶ Undo", topBar);
+    m_btnUndo->setToolTip("Undo (Ctrl+Z)");
+    m_btnUndo->setEnabled(false);
+    connect(m_btnUndo, &QPushButton::clicked, m_canvasView, &BookCanvasView::undo);
+    topLayout->addWidget(m_btnUndo);
+
+    m_btnRedo = new QPushButton("Redo ↷", topBar);
+    m_btnRedo->setToolTip("Redo (Ctrl+Shift+Z)");
+    m_btnRedo->setEnabled(false);
+    connect(m_btnRedo, &QPushButton::clicked, m_canvasView, &BookCanvasView::redo);
+    topLayout->addWidget(m_btnRedo);
 
     QPushButton *btnResetZoom = new QPushButton("Fit Book", topBar);
     connect(btnResetZoom, &QPushButton::clicked, m_canvasView, &BookCanvasView::fitBookInView);
@@ -264,17 +335,11 @@ void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
     m_lblPageTracker->setStyleSheet("font-size: 12px; color: #dfbe87; font-weight: 700; margin: 0 10px;");
 
     connect(m_btnPrevSpread, &QPushButton::clicked, [this]() {
-        if (m_currentSpreadIndex > 0) {
-            m_currentSpreadIndex--;
-            updateNavigationState();
-        }
+        switchToSpread(m_currentSpreadIndex - 1);
     });
 
     connect(m_btnNextSpread, &QPushButton::clicked, [this]() {
-        if (m_currentSpreadIndex < m_activeProject.spreads.size() - 1) {
-            m_currentSpreadIndex++;
-            updateNavigationState();
-        }
+        switchToSpread(m_currentSpreadIndex + 1);
     });
 
     turnerLayout->addWidget(m_btnPrevSpread);
@@ -305,8 +370,7 @@ void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
         ns.layers.append(dl);
 
         m_activeProject.spreads.append(ns);
-        m_currentSpreadIndex = m_activeProject.spreads.size() - 1;
-        updateNavigationState();
+        switchToSpread(m_activeProject.spreads.size() - 1);
         saveProjectsToDisk();
     });
     botLayout->addWidget(btnAddPages);
@@ -316,13 +380,63 @@ void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
 
 void MainWindow::openProject(const BookProject &proj) {
     m_activeProject = proj;
+    if (m_activeProject.spreads.isEmpty()) {
+        BookSpread first;
+        first.id = "s-1";
+        first.activeLayerId = "layer-1";
+        CanvasLayer layer;
+        layer.id = "layer-1";
+        layer.name = "Artwork Layer";
+        first.layers.append(layer);
+        m_activeProject.spreads.append(first);
+    }
     m_currentSpreadIndex = 0;
     m_lblTitle->setText(m_activeProject.title);
 
+    {
+        QSignalBlocker blocker(m_comboThemes);
+        int themeIndex = m_comboThemes->findData(m_activeProject.themeId);
+        m_comboThemes->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
+    }
     m_canvasView->setTheme(getThemeById(m_activeProject.themeId));
+
+    m_canvasView->clearUndoHistory();
+    const auto &firstSpread = m_activeProject.spreads[0];
+    m_canvasView->loadSpread(firstSpread.id, firstSpread.canvasData);
+    m_lblSaveState->setText("All changes saved");
+
     m_stack->setCurrentIndex(1);
     updateNavigationState();
     m_canvasView->fitBookInView();
+    m_canvasView->setFocus();
+}
+
+bool MainWindow::isEditorOpen() const {
+    return m_stack->currentIndex() == 1;
+}
+
+void MainWindow::commitCanvas() {
+    if (!isEditorOpen() || m_activeProject.spreads.isEmpty()) return;
+    m_activeProject.spreads[m_currentSpreadIndex].canvasData = m_canvasView->saveSpread();
+}
+
+void MainWindow::switchToSpread(int index) {
+    if (index < 0 || index >= m_activeProject.spreads.size()) return;
+    commitCanvas();
+    m_currentSpreadIndex = index;
+    const auto &spread = m_activeProject.spreads[index];
+    m_canvasView->loadSpread(spread.id, spread.canvasData);
+    updateNavigationState();
+}
+
+void MainWindow::scheduleAutosave() {
+    m_lblSaveState->setText("Unsaved changes…");
+    m_autosaveTimer->start();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    if (isEditorOpen()) saveProjectsToDisk();
+    event->accept();
 }
 
 void MainWindow::updateNavigationState() {
@@ -355,8 +469,7 @@ void MainWindow::updateNavigationState() {
             chip->setStyleSheet("background: #3b2012; border: 1.5px solid #5a351f; color: #dfbe87; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700;");
         }
         connect(chip, &QPushButton::clicked, [this, i]() {
-            m_currentSpreadIndex = i;
-            updateNavigationState();
+            switchToSpread(i);
         });
         m_chipsLayout->addWidget(chip);
     }
@@ -411,6 +524,9 @@ void MainWindow::loadProjectsFromDisk() {
 }
 
 void MainWindow::saveProjectsToDisk() {
+    m_autosaveTimer->stop();
+    commitCanvas();
+
     for (int i = 0; i < m_projects.size(); ++i) {
         if (m_projects[i].id == m_activeProject.id) {
             m_projects[i] = m_activeProject;
@@ -420,15 +536,22 @@ void MainWindow::saveProjectsToDisk() {
 
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     QDir().mkpath(configDir);
-    QFile file(configDir + "/projects.json");
+    // QSaveFile writes to a temporary file first, so a crash mid-save can't wipe her books.
+    QSaveFile file(configDir + "/projects.json");
 
+    bool saved = false;
     if (file.open(QIODevice::WriteOnly)) {
         QJsonArray arr;
         for (const auto &p : m_projects) {
             arr.append(p.toJson());
         }
         QJsonDocument doc(arr);
-        file.write(doc.toJson(QJsonDocument::Indented));
+        file.write(doc.toJson(QJsonDocument::Compact));
+        saved = file.commit();
+    }
+
+    if (isEditorOpen()) {
+        m_lblSaveState->setText(saved ? "All changes saved" : "⚠ Could not save!");
     }
 }
 
@@ -444,17 +567,25 @@ void MainWindow::exportPdf() {
     );
     if (filePath.isEmpty()) return;
 
+    QMessageBox layoutBox(this);
+    layoutBox.setWindowTitle("PDF Layout");
+    layoutBox.setText("How should the pages be laid out?");
+    layoutBox.setInformativeText("Single pages suit printing and binding. Spreads show facing pages side by side, as on screen.");
+    QPushButton *btnSingle = layoutBox.addButton("Single Pages (for printing)", QMessageBox::AcceptRole);
+    QPushButton *btnSpreads = layoutBox.addButton("Two-Page Spreads", QMessageBox::AcceptRole);
+    layoutBox.addButton(QMessageBox::Cancel);
+    layoutBox.setDefaultButton(btnSingle);
+    layoutBox.exec();
+    if (layoutBox.clickedButton() != btnSingle && layoutBox.clickedButton() != btnSpreads) return;
+    const auto layout = layoutBox.clickedButton() == btnSingle ? PdfExporter::Layout::SinglePages : PdfExporter::Layout::Spreads;
+
+    saveProjectsToDisk();
+
     BookTheme theme = getThemeById(m_activeProject.themeId);
-    bool success = PdfExporter::exportProjectToPdf(
-        m_activeProject,
-        theme,
-        m_canvasView->scene(),
-        m_activeProject.spreads[m_currentSpreadIndex].id,
-        filePath
-    );
+    bool success = PdfExporter::exportProjectToPdf(m_activeProject, theme, layout, filePath);
 
     if (success) {
-        QMessageBox::information(this, "Export Succeeded", "PDF book spread export completed successfully.");
+        QMessageBox::information(this, "Export Succeeded", QString("Your book was saved as a PDF with all %1 pages.").arg(m_activeProject.spreads.size() * 2));
     } else {
         QMessageBox::critical(this, "Export Failed", "Could not generate PDF export.");
     }
