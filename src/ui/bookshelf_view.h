@@ -26,6 +26,7 @@ signals:
     void deleteProjectRequested(const QString &projectId);
     void duplicateProjectRequested(const BookProject &project);
     void exportJsonRequested(const BookProject &project);
+    void settingsRequested();
 
 private:
     void setupUi();

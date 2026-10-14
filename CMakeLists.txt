@@ -45,6 +45,14 @@ add_executable(book-creator-native
     src/utils/asset_store.cpp
     src/ui/page_sorter_dialog.h
     src/ui/page_sorter_dialog.cpp
+    src/ui/settings_dialog.h
+    src/ui/settings_dialog.cpp
+    src/ui/story_helper_dialog.h
+    src/ui/story_helper_dialog.cpp
+    src/utils/app_settings.h
+    src/utils/app_settings.cpp
+    src/utils/story_helper.h
+    src/utils/story_helper.cpp
     assets/resources.qrc
 )
 

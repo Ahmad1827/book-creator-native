@@ -3,6 +3,8 @@
 #include "pdf_exporter.h"
 #include "page_sorter_dialog.h"
 #include "asset_store.h"
+#include "app_settings.h"
+#include "settings_dialog.h"
 #include <QImageReader>
 #include <QUuid>
 #include <QFileDialog>
@@ -91,6 +93,8 @@ MainWindow::MainWindow(QWidget *parent)
     loadProjectsFromDisk();
 
     connect(m_canvasView, &BookCanvasView::contentChanged, this, &MainWindow::scheduleAutosave);
+    connect(m_bookshelfView, &BookshelfView::settingsRequested, this, &MainWindow::openSettings);
+    applySettings();
 
     QAction *actUndo = new QAction("Undo", this);
     actUndo->setShortcuts({QKeySequence::Undo});
@@ -327,6 +331,7 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
 
     QPushButton *btnShelf = new QPushButton("← Shelf", topBar);
     connect(btnShelf, &QPushButton::clicked, [this]() {
+        if (m_helperDialog) m_helperDialog->close();
         saveProjectsToDisk();
         m_bookshelfView->setProjects(m_projects);
         m_stack->setCurrentIndex(0);
@@ -366,6 +371,11 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
         m_canvasView->setFocus();
     });
     topLayout->addWidget(btnPicture);
+
+    m_btnHelper = new QPushButton("Story Helper", topBar);
+    m_btnHelper->setToolTip("Ideas for your words from Claude: rhymes, silly words, what happens next…");
+    connect(m_btnHelper, &QPushButton::clicked, this, &MainWindow::openStoryHelper);
+    topLayout->addWidget(m_btnHelper);
 
     m_lblSaveState = new QLabel(topBar);
     m_lblSaveState->setStyleSheet("color: #dfbe87; font-weight: 700; font-size: 11px; border: none; background: transparent;");
@@ -523,6 +533,36 @@ void MainWindow::arrangePages() {
     m_canvasView->loadSpread(spread.id, spread.canvasData);
     updateNavigationState();
     saveProjectsToDisk();
+}
+
+void MainWindow::openSettings() {
+    SettingsDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) applySettings();
+}
+
+void MainWindow::applySettings() {
+    const bool helperOn = AppSettings::helperBackend() == AppSettings::HelperBackend::ClaudeCode;
+    m_btnHelper->setVisible(helperOn);
+    if (!helperOn && m_helperDialog) m_helperDialog->close();
+}
+
+void MainWindow::openStoryHelper() {
+    if (!m_helperDialog) {
+        m_helperDialog = new StoryHelperDialog(m_canvasView, [this]() {
+            commitCanvas();
+            return qMakePair(m_activeProject.title, StoryHelper::storyText(m_activeProject));
+        }, this);
+        m_helperDialog->setAttribute(Qt::WA_DeleteOnClose);
+        connect(m_helperDialog, &StoryHelperDialog::settingsRequested, this, &MainWindow::openSettings);
+        // Park it beside the book rather than on top of the pages.
+        const QPoint topRight = mapToGlobal(QPoint(width() - m_helperDialog->width() - 40, 80));
+        m_helperDialog->move(topRight);
+    } else {
+        m_helperDialog->pullSelectedText();
+    }
+    m_helperDialog->show();
+    m_helperDialog->raise();
+    m_helperDialog->activateWindow();
 }
 
 void MainWindow::scheduleAutosave() {

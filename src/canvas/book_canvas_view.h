@@ -56,6 +56,11 @@ public:
     bool importImage(const QImage &image);
     void setPageNumbers(int leftNum, int rightNum);
 
+    // Story Helper hooks: the text box she selected (or last worked on).
+    QString selectedStoryText() const;
+    bool replaceSelectedStoryText(const QString &text);
+    void addStoryTextBox(const QString &text);
+
     void duplicateSelectedItem();
     void deleteSelectedItem();
     void bringSelectedItemToFront();
@@ -110,6 +115,7 @@ private:
     void handleTextClick(const QPointF &scenePos, QMouseEvent *event);
     StoryTextItem *textItemAt(const QPointF &scenePos) const;
     StoryTextItem *editingTextItem() const;
+    StoryTextItem *helperTargetText() const;
     void finishTextEditing();
     void onTextEditingFinished(StoryTextItem *item);
     QList<StoryTextItem*> selectedTextItems() const;
@@ -178,6 +184,7 @@ private:
     QPoint m_lastPanPoint;
     bool m_initialFitDone = false;
 
+    QPointer<StoryTextItem> m_lastTextItem;
     int m_leftPageNum = 0;
     int m_rightPageNum = 0;
 

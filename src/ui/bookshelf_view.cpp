@@ -36,6 +36,14 @@ void BookshelfView::setupUi() {
 
     navLayout->addStretch();
 
+    QPushButton *btnSettings = new QPushButton("Settings", navBar);
+    btnSettings->setStyleSheet(
+        "QPushButton { background: transparent; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 7px 14px; font-weight: bold; color: #faebd7; font-size: 11px; }"
+        "QPushButton:hover { background: #5a351f; }"
+    );
+    connect(btnSettings, &QPushButton::clicked, this, &BookshelfView::settingsRequested);
+    navLayout->addWidget(btnSettings);
+
     QPushButton *btnLoad = new QPushButton("Load Book (.json)", navBar);
     btnLoad->setStyleSheet(
         "QPushButton { background: #fbf5ea; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 7px 14px; font-weight: bold; color: #3b2212; font-size: 11px; }"

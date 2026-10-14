@@ -14,6 +14,7 @@
 #include "drawing_toolbox_dock.h"
 #include "layers_dock.h"
 #include "bookshelf_view.h"
+#include "story_helper_dialog.h"
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -35,6 +36,9 @@ private:
     bool isEditorOpen() const;
     void scheduleAutosave();
     void arrangePages();
+    void openSettings();
+    void openStoryHelper();
+    void applySettings();
     void loadProjectsFromDisk();
     void saveProjectsToDisk();
     void exportPdf();
@@ -62,4 +66,6 @@ private:
     QPushButton *m_btnUndo;
     QPushButton *m_btnRedo;
     QTimer *m_autosaveTimer;
+    QPushButton *m_btnHelper;
+    QPointer<StoryHelperDialog> m_helperDialog;
 };

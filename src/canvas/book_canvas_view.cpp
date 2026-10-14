@@ -74,6 +74,11 @@ BookCanvasView::BookCanvasView(QWidget *parent)
 
     // Resize/rotate handles sit outside item bounds, so repaint them in full.
     connect(m_scene, &QGraphicsScene::selectionChanged, viewport(), qOverload<>(&QWidget::update));
+    connect(m_scene, &QGraphicsScene::selectionChanged, this, [this]() {
+        for (auto *item : m_scene->selectedItems()) {
+            if (auto *text = dynamic_cast<StoryTextItem*>(item)) m_lastTextItem = text;
+        }
+    });
     connect(m_scene, &QGraphicsScene::changed, this, [this]() {
         if (handleTarget()) viewport()->update();
     });
@@ -505,6 +510,7 @@ void BookCanvasView::finishTextEditing() {
 }
 
 void BookCanvasView::onTextEditingFinished(StoryTextItem *item) {
+    m_lastTextItem = item;
     if (!item->toPlainText().trimmed().isEmpty()) {
         recordChange("Edit text");
         return;
@@ -519,6 +525,58 @@ void BookCanvasView::onTextEditingFinished(StoryTextItem *item) {
         delete guard.data();
         recordChange("Remove empty text");
     });
+}
+
+StoryTextItem *BookCanvasView::helperTargetText() const {
+    const auto selected = selectedTextItems();
+    if (!selected.isEmpty()) return selected.first();
+    // Switching tools clears the selection, so fall back to the box she last worked on.
+    if (m_lastTextItem && m_lastTextItem->scene() == m_scene) return m_lastTextItem;
+    return nullptr;
+}
+
+QString BookCanvasView::selectedStoryText() const {
+    StoryTextItem *text = helperTargetText();
+    return text ? text->toPlainText() : QString();
+}
+
+bool BookCanvasView::replaceSelectedStoryText(const QString &newText) {
+    StoryTextItem *text = helperTargetText();
+    if (!text) return false;
+    finishTextEditing();
+    text->setPlainText(newText);
+    recordChange("Story helper text");
+    return true;
+}
+
+void BookCanvasView::addStoryTextBox(const QString &content) {
+    finishTextEditing();
+
+    QRectF area;
+    for (auto *item : m_scene->items()) {
+        if (item->data(ItemRole::IsTemplate).toBool() && item->data(ItemRole::TemplateKind).toString() == "text"
+            && item->data(ItemRole::TemplateSide).toString() == m_activeSide) {
+            area = item->sceneBoundingRect().adjusted(12, 12, -12, -12);
+            break;
+        }
+    }
+    if (!area.isValid()) {
+        const qreal left = m_activeSide == "left" ? 80.0 : 680.0;
+        area = QRectF(left, 440, 440, 150);
+    }
+
+    auto *text = new StoryTextItem();
+    text->setStyle(m_textFamily, m_textPixelSize, m_textColor, m_textAlign);
+    text->setTextWidth(area.width());
+    text->setPlainText(content);
+    text->setPos(area.topLeft());
+    text->setZValue(nextTopZ());
+    m_scene->addItem(text);
+    adoptItem(text);
+    m_scene->clearSelection();
+    if (text->flags() & QGraphicsItem::ItemIsSelectable) text->setSelected(true);
+    m_lastTextItem = text;
+    recordChange("Add text");
 }
 
 QList<StoryTextItem*> BookCanvasView::selectedTextItems() const {
