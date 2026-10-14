@@ -104,13 +104,24 @@ struct BookSpread {
 };
 
 enum class DecorType {
-    Botanical,
-    Celestial,
-    Victorian,
-    Sakura,
-    Chai,
-    Brass
+    Scribble,
+    Dreams,
+    Sweets,
+    Garden,
+    Woods,
+    Seaside
 };
+
+// Books made before the storybook themes keep the closest new look.
+inline QString migrateThemeId(const QString &id) {
+    if (id == "botanical_meadow") return "peachy_garden";
+    if (id == "celestial_nocturne") return "dream_night";
+    if (id == "antique_heirloom") return "scribble_splash";
+    if (id == "sakura_bloom") return "sweet_shop";
+    if (id == "spiced_chai") return "wobbly_woods";
+    if (id == "brass_study") return "seaside";
+    return id;
+}
 
 struct BookTheme {
     QString id;
@@ -127,23 +138,23 @@ struct BookTheme {
 
     static QString decorTypeToString(DecorType type) {
         switch (type) {
-            case DecorType::Botanical: return "botanical";
-            case DecorType::Celestial: return "celestial";
-            case DecorType::Victorian: return "victorian";
-            case DecorType::Sakura: return "sakura";
-            case DecorType::Chai: return "chai";
-            case DecorType::Brass: return "brass";
+            case DecorType::Scribble: return "scribble";
+            case DecorType::Dreams: return "dreams";
+            case DecorType::Sweets: return "sweets";
+            case DecorType::Garden: return "garden";
+            case DecorType::Woods: return "woods";
+            case DecorType::Seaside: return "seaside";
         }
-        return "botanical";
+        return "scribble";
     }
 
     static DecorType stringToDecorType(const QString &str) {
-        if (str == "celestial") return DecorType::Celestial;
-        if (str == "victorian") return DecorType::Victorian;
-        if (str == "sakura") return DecorType::Sakura;
-        if (str == "chai") return DecorType::Chai;
-        if (str == "brass") return DecorType::Brass;
-        return DecorType::Botanical;
+        if (str == "dreams") return DecorType::Dreams;
+        if (str == "sweets") return DecorType::Sweets;
+        if (str == "garden") return DecorType::Garden;
+        if (str == "woods") return DecorType::Woods;
+        if (str == "seaside") return DecorType::Seaside;
+        return DecorType::Scribble;
     }
 
     QJsonObject toJson() const {
@@ -225,7 +236,7 @@ struct BookProject {
         project.id = obj["id"].toString();
         project.title = obj["title"].toString();
         project.author = obj["author"].toString();
-        project.themeId = obj["themeId"].toString("botanical_meadow");
+        project.themeId = migrateThemeId(obj["themeId"].toString("scribble_splash"));
         project.createdAt = obj["createdAt"].toString();
         project.showPageNumbers = obj["showPageNumbers"].toBool(true);
         project.formatId = obj["format"].toString("classic");

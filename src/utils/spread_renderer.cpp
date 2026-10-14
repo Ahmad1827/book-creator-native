@@ -14,11 +14,6 @@ void SpreadRenderer::paint(QPainter &painter, const BookTheme &theme, const Book
     // Paper runs under the bleed too, so trimming never leaves a white sliver.
     painter.fillRect(source.united(spreadRect(pageHeight)), theme.paperBg);
 
-    painter.setPen(QPen(theme.borderColor, 2));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawRect(leftPageRect(pageHeight).adjusted(12, 12, -12, -12));
-    painter.drawRect(rightPageRect(pageHeight).adjusted(12, 12, -12, -12));
-
     ThemeDecors::draw(&painter, theme, pageHeight);
 
     if (showPageNumbers && !spread.isCover()) {

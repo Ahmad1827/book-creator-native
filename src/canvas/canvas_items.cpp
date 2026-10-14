@@ -1,5 +1,6 @@
 #include "canvas_items.h"
 #include "asset_store.h"
+#include "sketch.h"
 #include <QPainter>
 #include <QStyleOptionGraphicsItem>
 #include <QTextBlock>
@@ -549,6 +550,66 @@ ImageItem::ImageItem(const QString &assetId)
 }
 
 // ---------------------------------------------------------------------------
+// Sketchy shapes
+
+namespace {
+
+void paintSketchShape(QPainter *painter, const QPainterPath &outline, const QPen &pen, const QBrush &brush) {
+    if (brush.style() != Qt::NoBrush && brush.color().alpha() > 0) {
+        Sketch::drawWash(painter, outline, brush.color(), QPointF(1.2, 1.4));
+    }
+    if (pen.style() == Qt::NoPen || pen.widthF() <= 0) return;
+    if (pen.style() == Qt::SolidLine) {
+        Sketch::drawInk(painter, outline, pen.color(), pen.widthF());
+    } else {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        QPen dashed = pen;
+        dashed.setCapStyle(Qt::RoundCap);
+        painter->setPen(dashed);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawPath(outline);
+        painter->restore();
+    }
+}
+
+// A gentle wobble that stays in proportion on small shapes.
+qreal wobbleFor(const QRectF &rect) {
+    return qBound(0.4, qMin(rect.width(), rect.height()) / 70.0, 1.6);
+}
+
+constexpr qreal kSketchMargin = 4.0;
+
+} // namespace
+
+QRectF SketchRectItem::boundingRect() const {
+    return QGraphicsRectItem::boundingRect().adjusted(-kSketchMargin, -kSketchMargin, kSketchMargin, kSketchMargin);
+}
+
+void SketchRectItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
+    const QRectF r = rect();
+    paintSketchShape(painter, Sketch::wobblyRoundedRect(r, 4, Sketch::seedFor(r.size(), quint32(r.x())), wobbleFor(r)), pen(), brush());
+}
+
+QRectF SketchEllipseItem::boundingRect() const {
+    return QGraphicsEllipseItem::boundingRect().adjusted(-kSketchMargin, -kSketchMargin, kSketchMargin, kSketchMargin);
+}
+
+void SketchEllipseItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
+    const QRectF r = rect();
+    paintSketchShape(painter, Sketch::wobblyEllipse(r, Sketch::seedFor(r.size(), quint32(r.y())), wobbleFor(r)), pen(), brush());
+}
+
+QRectF SketchPathItem::boundingRect() const {
+    return QGraphicsPathItem::boundingRect().adjusted(-kSketchMargin, -kSketchMargin, kSketchMargin, kSketchMargin);
+}
+
+void SketchPathItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *, QWidget *) {
+    paintSketchShape(painter, path(), pen(), brush());
+}
+
+
+// ---------------------------------------------------------------------------
 // CanvasSerializer
 
 QString CanvasSerializer::newId() {
@@ -667,17 +728,17 @@ QGraphicsItem *CanvasSerializer::itemFromJson(const QJsonObject &obj) {
     } else if (type == "path") {
         QPainterPath path = pathFromJson(obj["path"].toArray());
         path.setFillRule(Qt::FillRule(obj["fillRule"].toInt(int(Qt::OddEvenFill))));
-        auto *pathItem = new QGraphicsPathItem(path);
+        auto *pathItem = new SketchPathItem(path);
         pathItem->setPen(penFromJson(obj["pen"].toObject()));
         pathItem->setBrush(brushFromJson(obj["fill"]));
         item = pathItem;
     } else if (type == "rect") {
-        auto *rectItem = new QGraphicsRectItem(rectFromJson(obj["rect"]));
+        auto *rectItem = new SketchRectItem(rectFromJson(obj["rect"]));
         rectItem->setPen(penFromJson(obj["pen"].toObject()));
         rectItem->setBrush(brushFromJson(obj["fill"]));
         item = rectItem;
     } else if (type == "ellipse") {
-        auto *ellipseItem = new QGraphicsEllipseItem(rectFromJson(obj["rect"]));
+        auto *ellipseItem = new SketchEllipseItem(rectFromJson(obj["rect"]));
         ellipseItem->setPen(penFromJson(obj["pen"].toObject()));
         ellipseItem->setBrush(brushFromJson(obj["fill"]));
         item = ellipseItem;

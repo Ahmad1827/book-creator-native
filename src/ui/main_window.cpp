@@ -646,7 +646,7 @@ void MainWindow::loadProjectsFromDisk() {
         p1.id = "book-default-1";
         p1.title = "The Fox & The Firefly";
         p1.author = "Ahmad";
-        p1.themeId = "botanical_meadow";
+        p1.themeId = "scribble_splash";
         p1.createdAt = "09/07/2026";
 
         BookSpread s1;

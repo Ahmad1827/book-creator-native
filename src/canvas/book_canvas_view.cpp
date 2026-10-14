@@ -18,6 +18,34 @@
 
 namespace {
 
+template <typename Item, typename Shape>
+Item *addSketchItem(QGraphicsScene *scene, const Shape &shape, const QPen &pen, const QBrush &brush) {
+    auto *item = new Item(shape);
+    item->setPen(pen);
+    item->setBrush(brush);
+    scene->addItem(item);
+    return item;
+}
+
+SketchRectItem *addSketchRect(QGraphicsScene *scene, const QRectF &rect, const QPen &pen, const QBrush &brush) {
+    return addSketchItem<SketchRectItem>(scene, rect, pen, brush);
+}
+
+SketchEllipseItem *addSketchEllipse(QGraphicsScene *scene, const QRectF &rect, const QPen &pen, const QBrush &brush) {
+    return addSketchItem<SketchEllipseItem>(scene, rect, pen, brush);
+}
+
+// A layout frame's own outline in scene coordinates, without the room left for its wobbly ink.
+QRectF layoutFrameRect(const QGraphicsItem *item) {
+    if (auto *rect = dynamic_cast<const QGraphicsRectItem*>(item)) return rect->mapRectToScene(rect->rect());
+    if (auto *ellipse = dynamic_cast<const QGraphicsEllipseItem*>(item)) return ellipse->mapRectToScene(ellipse->rect());
+    return item->sceneBoundingRect();
+}
+
+SketchPathItem *addSketchPath(QGraphicsScene *scene, const QPainterPath &path, const QPen &pen, const QBrush &brush) {
+    return addSketchItem<SketchPathItem>(scene, path, pen, brush);
+}
+
 // Stores only the items that changed, as JSON before and after, so history stays small.
 class CanvasChangeCommand : public QUndoCommand {
 public:
@@ -587,7 +615,7 @@ void BookCanvasView::addStoryTextBox(const QString &content) {
     for (auto *item : m_scene->items()) {
         if (item->data(ItemRole::IsTemplate).toBool() && item->data(ItemRole::TemplateKind).toString() == "text"
             && item->data(ItemRole::TemplateSide).toString() == m_activeSide) {
-            area = item->sceneBoundingRect().adjusted(12, 12, -12, -12);
+            area = layoutFrameRect(item).adjusted(12, 12, -12, -12);
             break;
         }
     }
@@ -653,7 +681,7 @@ void BookCanvasView::handleTextClick(const QPointF &scenePos, QMouseEvent *event
     QRectF card;
     for (auto *item : m_scene->items(scenePos)) {
         if (item->data(ItemRole::IsTemplate).toBool() && item->data(ItemRole::TemplateKind).toString() == "text") {
-            card = item->sceneBoundingRect();
+            card = layoutFrameRect(item);
             break;
         }
     }
@@ -767,11 +795,6 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 
     painter->setPen(QPen(QColor(0, 0, 0, 100), 1));
     painter->drawLine(QPointF(600, 0), QPointF(600, h));
-
-    painter->setPen(QPen(m_theme.borderColor, 2));
-    painter->setBrush(Qt::NoBrush);
-    painter->drawRect(leftPage.adjusted(12, 12, -12, -12));
-    painter->drawRect(rightPage.adjusted(12, 12, -12, -12));
 
     ThemeDecors::draw(painter, m_theme, h);
     ThemeDecors::drawPageNumbers(painter, m_theme, m_leftPageNum, m_rightPageNum, h);
@@ -905,7 +928,7 @@ QRectF BookCanvasView::artFrameFor(const QString &side, const QPointF *point) co
     for (auto *item : m_scene->items()) {
         if (!item->data(ItemRole::IsTemplate).toBool() || item->data(ItemRole::TemplateKind).toString() != "art") continue;
         const QString itemSide = item->data(ItemRole::TemplateSide).toString();
-        const QRectF frame = item->sceneBoundingRect().adjusted(2, 2, -2, -2);
+        const QRectF frame = layoutFrameRect(item).adjusted(2, 2, -2, -2);
         if (point) {
             // A drop picks the frame it lands in.
             if (frame.contains(*point)) return frame;
@@ -1430,9 +1453,9 @@ void BookCanvasView::addStoryShape(const QString &shapeType, const QColor &fill,
     }
 
     if (shapeType == "circle" || shapeType == "round") {
-        item = m_scene->addEllipse(posX, posY, 100, 100, pen, brush);
+        item = addSketchEllipse(m_scene, QRectF(posX, posY, 100, 100), pen, brush);
     } else if (shapeType == "rect" || shapeType == "frame") {
-        item = m_scene->addRect(posX, posY, 140, 90, pen, brush);
+        item = addSketchRect(m_scene, QRectF(posX, posY, 140, 90), pen, brush);
     } else if (shapeType == "star") {
         QPainterPath p;
         p.moveTo(posX + 50, posY + 0);
@@ -1446,13 +1469,13 @@ void BookCanvasView::addStoryShape(const QString &shapeType, const QColor &fill,
         p.lineTo(posX + 0, posY + 35);
         p.lineTo(posX + 37, posY + 35);
         p.closeSubpath();
-        item = m_scene->addPath(p, pen, brush);
+        item = addSketchPath(m_scene, p, pen, brush);
     } else if (shapeType == "heart") {
         QPainterPath p;
         p.moveTo(posX + 70, posY + 20);
         p.cubicTo(posX + 35, posY - 15, posX + 0, posY + 40, posX + 70, posY + 90);
         p.cubicTo(posX + 140, posY + 40, posX + 105, posY - 15, posX + 70, posY + 20);
-        item = m_scene->addPath(p, pen, brush);
+        item = addSketchPath(m_scene, p, pen, brush);
     } else if (shapeType == "cloud") {
         QPainterPath p;
         p.addEllipse(QPointF(posX + 40, posY + 55), 32, 26);
@@ -1464,13 +1487,13 @@ void BookCanvasView::addStoryShape(const QString &shapeType, const QColor &fill,
             circle.addEllipse(puff.first, puff.second, puff.second * 0.9);
             p = p.united(circle);
         }
-        item = m_scene->addPath(p, pen, brush);
+        item = addSketchPath(m_scene, p, pen, brush);
     } else if (shapeType == "moon") {
         QPainterPath disc;
         disc.addEllipse(QPointF(posX + 50, posY + 50), 50, 50);
         QPainterPath bite;
         bite.addEllipse(QPointF(posX + 74, posY + 38), 44, 44);
-        item = m_scene->addPath(disc.subtracted(bite), pen, brush);
+        item = addSketchPath(m_scene, disc.subtracted(bite), pen, brush);
     } else if (shapeType == "flower") {
         const QPointF c(posX + 55, posY + 55);
         // A disc under the petals closes the gap where their tips meet.
@@ -1485,9 +1508,9 @@ void BookCanvasView::addStoryShape(const QString &shapeType, const QColor &fill,
         // The centre is outlined within the same shape, so the flower moves as one piece.
         p.setFillRule(Qt::WindingFill);
         p.addEllipse(c, 16, 16);
-        item = m_scene->addPath(p, pen, brush);
+        item = addSketchPath(m_scene, p, pen, brush);
     } else {
-        item = m_scene->addRect(posX, posY, 120, 80, pen, brush);
+        item = addSketchRect(m_scene, QRectF(posX, posY, 120, 80), pen, brush);
     }
 
     if (item) {
@@ -1589,37 +1612,43 @@ void BookCanvasView::applyPageTemplate(const QString &side, const QString &templ
     auto R = [fy](qreal x, qreal y, qreal w, qreal h) { return QRectF(x, y * fy, w, h * fy); };
 
     QPen borderPen(m_theme.borderColor, 2);
-    QBrush artBrush(QColor(255, 255, 255, 115));
-    QBrush cardBrush(QColor(255, 255, 255, 220));
+    // Frames are a lighter sheet of the page's own paper, so they suit dark pages too.
+    const bool darkPaper = m_theme.paperBg.lightness() < 110;
+    QColor art = darkPaper ? m_theme.paperBg.lighter(135) : QColor(255, 255, 255);
+    art.setAlpha(darkPaper ? 120 : 115);
+    QColor card = darkPaper ? m_theme.paperBg.lighter(150) : QColor(255, 255, 255);
+    card.setAlpha(220);
+    QBrush artBrush(art);
+    QBrush cardBrush(card);
 
     if (templateType == "top_art_bottom_text") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 50, pageWidth, 320), borderPen, artBrush), side, "art");
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 390, pageWidth, 210), borderPen, cardBrush), side, "text");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 50, pageWidth, 320), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 390, pageWidth, 210), borderPen, cardBrush), side, "text");
     } else if (templateType == "bottom_art_top_text") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 50, pageWidth, 210), borderPen, cardBrush), side, "text");
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 280, pageWidth, 320), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 50, pageWidth, 210), borderPen, cardBrush), side, "text");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 280, pageWidth, 320), borderPen, artBrush), side, "art");
     } else if (templateType == "big_art_caption") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 50, pageWidth, 440), borderPen, artBrush), side, "art");
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 505, pageWidth, 95), borderPen, cardBrush), side, "text");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 50, pageWidth, 440), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 505, pageWidth, 95), borderPen, cardBrush), side, "text");
     } else if (templateType == "full_page_art") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft - 36, 24, pageWidth + 72, 602), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft - 36, 24, pageWidth + 72, 602), borderPen, artBrush), side, "art");
     } else if (templateType == "text_page") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 110, pageWidth, 430), borderPen, cardBrush), side, "text");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 110, pageWidth, 430), borderPen, cardBrush), side, "text");
     } else if (templateType == "spread_art") {
-        registerTemplateItem(m_scene->addRect(R(24, 24, 1152, 602), borderPen, artBrush), "spread", "art");
+        registerTemplateItem(addSketchRect(m_scene, R(24, 24, 1152, 602), borderPen, artBrush), "spread", "art");
     } else if (templateType == "classic_arch_story") {
         QPen dashedAccent(m_theme.accentColor, 2, Qt::DashLine);
-        registerTemplateItem(m_scene->addRect(R(pageLeft - 10, 40, pageWidth + 20, 570), dashedAccent, Qt::NoBrush), side, "");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft - 10, 40, pageWidth + 20, 570), dashedAccent, Qt::NoBrush), side, "");
     } else if (templateType == "storyboard_panels") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 50, pageWidth, 260), borderPen, artBrush), side, "art");
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 340, pageWidth, 260), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 50, pageWidth, 260), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 340, pageWidth, 260), borderPen, artBrush), side, "art");
     } else if (templateType == "spot_rhyme") {
         QPen dashedAccent(m_theme.accentColor, 2, Qt::DashLine);
-        registerTemplateItem(m_scene->addEllipse(QRectF(pageCenter - 110 * qMin(1.0, fy), 60 * fy, 220 * qMin(1.0, fy), 220 * qMin(1.0, fy)), dashedAccent, artBrush), side, "art");
-        registerTemplateItem(m_scene->addRect(R(pageLeft + 20, 330, pageWidth - 40, 270), borderPen, cardBrush), side, "text");
+        registerTemplateItem(addSketchEllipse(m_scene, QRectF(pageCenter - 110 * qMin(1.0, fy), 60 * fy, 220 * qMin(1.0, fy), 220 * qMin(1.0, fy)), dashedAccent, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft + 20, 330, pageWidth - 40, 270), borderPen, cardBrush), side, "text");
     } else if (templateType == "split_vertical") {
-        registerTemplateItem(m_scene->addRect(R(pageLeft, 50, 230, 550), borderPen, artBrush), side, "art");
-        registerTemplateItem(m_scene->addRect(R(pageLeft + 250, 50, 230, 550), borderPen, cardBrush), side, "text");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft, 50, 230, 550), borderPen, artBrush), side, "art");
+        registerTemplateItem(addSketchRect(m_scene, R(pageLeft + 250, 50, 230, 550), borderPen, cardBrush), side, "text");
     }
 
     recordChange("Page layout");

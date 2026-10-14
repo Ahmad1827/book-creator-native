@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QGraphicsPathItem>
+#include <QGraphicsRectItem>
+#include <QGraphicsEllipseItem>
 #include <QGraphicsTextItem>
 #include <QGraphicsPixmapItem>
 #include <QGraphicsScene>
@@ -141,6 +143,30 @@ public:
 
 private:
     QString m_assetId;
+};
+
+// Shapes and page-layout frames, painted like the rest of the book: a watercolour wash
+// sitting a little off a doubled ink line. They stay plain rect/ellipse/path items to the
+// rest of the app, so saving, erasing and resizing treat them as before.
+class SketchRectItem : public QGraphicsRectItem {
+public:
+    explicit SketchRectItem(const QRectF &rect, QGraphicsItem *parent = nullptr) : QGraphicsRectItem(rect, parent) {}
+    QRectF boundingRect() const override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
+};
+
+class SketchEllipseItem : public QGraphicsEllipseItem {
+public:
+    explicit SketchEllipseItem(const QRectF &rect, QGraphicsItem *parent = nullptr) : QGraphicsEllipseItem(rect, parent) {}
+    QRectF boundingRect() const override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
+};
+
+class SketchPathItem : public QGraphicsPathItem {
+public:
+    explicit SketchPathItem(const QPainterPath &path, QGraphicsItem *parent = nullptr) : QGraphicsPathItem(path, parent) {}
+    QRectF boundingRect() const override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
 };
 
 namespace CanvasSerializer {

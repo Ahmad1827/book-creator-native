@@ -29,84 +29,86 @@ inline const QList<FontDescriptor> FONTS = {
     {"Gochi Hand", "Handwritten"}
 };
 
+// Page colours: paperBg, inkColor (text), spineColor (book casing), borderColor (ink lines),
+// accentColor and frameColor (the two watercolour washes used for the doodles).
 inline const QList<BookTheme> THEMES = {
     {
-        "botanical_meadow",
-        "Botanical Meadow",
-        "Forest green binding, sage leaf borders & emerald vine corners",
-        QColor("#f6f8f3"),
-        QColor("#1d291e"),
-        QColor("#223b28"),
-        QColor("#cfe0d0"),
-        QColor("#588157"),
-        QColor("#4f772d"),
-        DecorType::Botanical,
+        "scribble_splash",
+        "Scribble & Splash",
+        "Cream paper, scratchy ink and splashes of tomato and sunshine",
+        QColor("#fffaf0"),
+        QColor("#1f1a17"),
+        QColor("#e8553e"),
+        QColor("#2a221d"),
+        QColor("#ffd25a"),
+        QColor("#f26b4f"),
+        DecorType::Scribble,
         "Patrick Hand"
     },
     {
-        "celestial_nocturne",
-        "Celestial Starlight",
-        "Midnight indigo spine with golden crescent stars and cosmic corners",
-        QColor("#1c2234"),
-        QColor("#f3f5fa"),
-        QColor("#0f1422"),
-        QColor("#2e3752"),
-        QColor("#f59e0b"),
-        QColor("#fbbf24"),
-        DecorType::Celestial,
-        "Comfortaa"
+        "dream_night",
+        "Dream-Catcher Night",
+        "Midnight pages, golden stars and floating dream bubbles",
+        QColor("#22305a"),
+        QColor("#fff4dc"),
+        QColor("#141c38"),
+        QColor("#f3e6c4"),
+        QColor("#ffd25a"),
+        QColor("#bf9cef"),
+        DecorType::Dreams,
+        "Pangolin"
     },
     {
-        "antique_heirloom",
-        "Antique Leather & Gold",
-        "Burnished cognac leather, warm parchment with filigree corners",
-        QColor("#faf2e3"),
-        QColor("#2b1a11"),
-        QColor("#3d1b0c"),
-        QColor("#e3d1b6"),
-        QColor("#b48448"),
-        QColor("#c69255"),
-        DecorType::Victorian,
-        "Lora"
+        "sweet_shop",
+        "Sweetshop Stripes",
+        "Strawberry-cream paper, candy stripes and wrapped sweets",
+        QColor("#fff2f0"),
+        QColor("#3a1d2b"),
+        QColor("#6b3a2a"),
+        QColor("#3a1d2b"),
+        QColor("#ff8fab"),
+        QColor("#7fd8be"),
+        DecorType::Sweets,
+        "Sniglet"
     },
     {
-        "sakura_bloom",
-        "Sakura Tea Garden",
-        "Rose-tinted rice paper with cherry blossom twigs & coral corners",
-        QColor("#fdf6f5"),
-        QColor("#2e1a22"),
-        QColor("#421d28"),
-        QColor("#edd6db"),
-        QColor("#e07a5f"),
-        QColor("#d9777f"),
-        DecorType::Sakura,
-        "Caveat"
-    },
-    {
-        "spiced_chai",
-        "Spiced Chai & Tweed",
-        "Warm terracotta paper, cozy autumn stitch lines & acorn motifs",
-        QColor("#f7eee3"),
-        QColor("#381c12"),
-        QColor("#451e0e"),
-        QColor("#dfc7b0"),
-        QColor("#c68b59"),
-        QColor("#b06d3b"),
-        DecorType::Chai,
+        "peachy_garden",
+        "Enormous Garden",
+        "Sunny peach paper, grass tufts, leaves and ladybirds",
+        QColor("#fff5e8"),
+        QColor("#2d2416"),
+        QColor("#5f8f3a"),
+        QColor("#2d2416"),
+        QColor("#ffab5c"),
+        QColor("#9bd06a"),
+        DecorType::Garden,
         "Kalam"
     },
     {
-        "brass_study",
-        "Vintage Brass Library",
-        "Dark spruce boards with riveted brass corner brackets",
-        QColor("#fcfbf7"),
-        QColor("#232622"),
-        QColor("#1d2924"),
-        QColor("#dedad2"),
-        QColor("#d4af37"),
-        QColor("#b89730"),
-        DecorType::Brass,
-        "Fredoka"
+        "wobbly_woods",
+        "Wobbly Woods",
+        "Misty green pages, twisty twigs, toadstools and swirls",
+        QColor("#f1f2e4"),
+        QColor("#24201a"),
+        QColor("#5b3a7a"),
+        QColor("#24201a"),
+        QColor("#bf9cef"),
+        QColor("#ff9b54"),
+        DecorType::Woods,
+        "Gaegu"
+    },
+    {
+        "seaside",
+        "Seaside Splash",
+        "Pale sky paper, rolling waves, a cheery sun and seagulls",
+        QColor("#f0f8fb"),
+        QColor("#1a2a35"),
+        QColor("#2e7f8f"),
+        QColor("#1a2a35"),
+        QColor("#7cc0ee"),
+        QColor("#ffd25a"),
+        DecorType::Seaside,
+        "Indie Flower"
     }
 };
 
@@ -126,8 +128,9 @@ inline const QList<QColor> LOFI_PALETTE = {
 };
 
 inline const BookTheme& getThemeById(const QString &id) {
+    const QString current = migrateThemeId(id);
     for (const auto &t : THEMES) {
-        if (t.id == id) return t;
+        if (t.id == current) return t;
     }
     return THEMES[0];
 }
