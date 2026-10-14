@@ -7,6 +7,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <optional>
+#include "book_format.h"
 
 struct CanvasLayer {
     QString id;
@@ -170,6 +171,10 @@ struct BookProject {
     QList<BookSpread> spreads;
     QString createdAt;
     bool showPageNumbers = true;
+    QString formatId = "classic";
+
+    const BookFormat &format() const { return getFormatById(formatId); }
+    qreal pageHeight() const { return format().pageHeightUnits(); }
 
     bool hasCover() const { return !spreads.isEmpty() && spreads.first().isCover(); }
 
@@ -204,6 +209,7 @@ struct BookProject {
         obj["themeId"] = themeId;
         obj["createdAt"] = createdAt;
         obj["showPageNumbers"] = showPageNumbers;
+        obj["format"] = formatId;
 
         QJsonArray spreadsArr;
         for (const auto &spread : spreads) {
@@ -222,6 +228,7 @@ struct BookProject {
         project.themeId = obj["themeId"].toString("botanical_meadow");
         project.createdAt = obj["createdAt"].toString();
         project.showPageNumbers = obj["showPageNumbers"].toBool(true);
+        project.formatId = obj["format"].toString("classic");
 
         QJsonArray spreadsArr = obj["spreads"].toArray();
         for (const auto &val : spreadsArr) {

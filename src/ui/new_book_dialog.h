@@ -26,5 +26,6 @@ private:
     QLineEdit *m_editTitle;
     QLineEdit *m_editAuthor;
     QString m_selectedThemeId = "botanical_meadow";
+    QComboBox *m_comboFormat;
     QButtonGroup *m_themeGroup;
 };

@@ -21,6 +21,7 @@ add_executable(book-creator-native
     src/main.cpp
     src/models/types.h
     src/models/constants.h
+    src/models/book_format.h
     src/canvas/theme_decors.h
     src/canvas/theme_decors.cpp
     src/canvas/canvas_items.h
@@ -45,6 +46,8 @@ add_executable(book-creator-native
     src/utils/asset_store.cpp
     src/ui/page_sorter_dialog.h
     src/ui/page_sorter_dialog.cpp
+    src/ui/export_dialog.h
+    src/ui/export_dialog.cpp
     src/ui/settings_dialog.h
     src/ui/settings_dialog.cpp
     src/ui/story_helper_dialog.h

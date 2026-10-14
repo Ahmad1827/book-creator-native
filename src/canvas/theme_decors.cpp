@@ -73,7 +73,7 @@ QString ThemeDecors::getCornerSvg(const BookTheme &theme, const QString &placeme
     ).arg(color, paper);
 }
 
-void ThemeDecors::draw(QPainter *painter, const BookTheme &theme) {
+void ThemeDecors::draw(QPainter *painter, const BookTheme &theme, qreal pageHeight) {
     auto renderCorner = [&](const QString &placement, qreal centerX, qreal centerY, bool flipX, bool flipY) {
         QString svg = getCornerSvg(theme, placement);
         QSvgRenderer renderer(svg.toUtf8());
@@ -86,12 +86,12 @@ void ThemeDecors::draw(QPainter *painter, const BookTheme &theme) {
     };
 
     renderCorner("tl", 49, 49, false, false);
-    renderCorner("bl", 49, 601, false, true);
+    renderCorner("bl", 49, pageHeight - 49, false, true);
 
     renderCorner("tr", 1151, 49, true, false);
-    renderCorner("br", 1151, 601, true, true);
+    renderCorner("br", 1151, pageHeight - 49, true, true);
 }
-void ThemeDecors::drawPageNumbers(QPainter *painter, const BookTheme &theme, int leftNum, int rightNum) {
+void ThemeDecors::drawPageNumbers(QPainter *painter, const BookTheme &theme, int leftNum, int rightNum, qreal pageHeight) {
     painter->save();
     QFont font(theme.recommendedFont);
     font.setPixelSize(16);
@@ -99,7 +99,7 @@ void ThemeDecors::drawPageNumbers(QPainter *painter, const BookTheme &theme, int
     QColor ink = theme.inkColor;
     ink.setAlpha(170);
     painter->setPen(ink);
-    if (leftNum > 0) painter->drawText(QRectF(250, 606, 100, 24), Qt::AlignCenter, QString::number(leftNum));
-    if (rightNum > 0) painter->drawText(QRectF(850, 606, 100, 24), Qt::AlignCenter, QString::number(rightNum));
+    if (leftNum > 0) painter->drawText(QRectF(250, pageHeight - 44, 100, 24), Qt::AlignCenter, QString::number(leftNum));
+    if (rightNum > 0) painter->drawText(QRectF(850, pageHeight - 44, 100, 24), Qt::AlignCenter, QString::number(rightNum));
     painter->restore();
 }

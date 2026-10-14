@@ -47,6 +47,9 @@ public:
     void setTextPixelSize(int size);
     void setTextColor(const QColor &color);
     void setTextAlignment(Qt::Alignment align);
+    void setTextEffect(const QString &effect);
+    // Re-rolls the jiggle of the selected lettering.
+    void shuffleTextEffect();
 
     void addStoryShape(const QString &shapeType, const QColor &fill, const QColor &stroke, qreal strokeWidth);
     void addStorySticker(const QString &stickerId, const QString &svgPath, const QColor &fill);
@@ -55,6 +58,9 @@ public:
     bool importImageFile(const QString &path, QString *error = nullptr);
     bool importImage(const QImage &image);
     void setPageNumbers(int leftNum, int rightNum);
+    // Page proportions come from the book's print size; pages are always 600 units wide.
+    void setPageHeight(qreal pageHeight);
+    qreal pageHeight() const { return m_pageHeight; }
 
     // Story Helper hooks: the text box she selected (or last worked on).
     QString selectedStoryText() const;
@@ -141,6 +147,9 @@ private:
     void fitItemInto(QGraphicsItem *item, const QRectF &frame, bool cover);
     static void centerTransformOrigin(QGraphicsItem *item);
 
+    void addBubble(const QString &kind);
+    void applyNewTextStyle(StoryTextItem *text) const;
+
     void adoptItem(QGraphicsItem *item);
     void applyInteractionFlags(QGraphicsItem *item);
     void updateCursor();
@@ -168,6 +177,7 @@ private:
     int m_textPixelSize = 28;
     QColor m_textColor = QColor("#1d291e");
     Qt::Alignment m_textAlign = Qt::AlignLeft;
+    QString m_textEffect = "none";
 
     bool m_isDrawing = false;
     bool m_isErasing = false;
@@ -185,6 +195,7 @@ private:
     bool m_initialFitDone = false;
 
     QPointer<StoryTextItem> m_lastTextItem;
+    qreal m_pageHeight = 650.0;
     int m_leftPageNum = 0;
     int m_rightPageNum = 0;
 

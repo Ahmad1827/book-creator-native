@@ -8,6 +8,7 @@
 #include <QMessageBox>
 #include <QPainter>
 #include <QUuid>
+#include <QComboBox>
 
 namespace {
 
@@ -55,7 +56,7 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
     m_list->setWrapping(true);
     m_list->setResizeMode(QListView::Adjust);
     m_list->setSpacing(10);
-    m_list->setIconSize(QSize(kThumbWidth, qRound(kThumbWidth * 650.0 / 1200.0) + kCaptionHeight));
+    m_list->setIconSize(QSize(kThumbWidth, qRound(kThumbWidth * 750.0 / 1200.0) + kCaptionHeight));
     m_list->setDragDropMode(QAbstractItemView::InternalMove);
     m_list->setDefaultDropAction(Qt::MoveAction);
     m_list->setSelectionMode(QAbstractItemView::SingleSelection);
@@ -104,6 +105,24 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
     });
     actions->addWidget(m_chkPageNumbers);
     layout->addLayout(actions);
+
+    QHBoxLayout *sizeRow = new QHBoxLayout();
+    QLabel *lblSize = new QLabel("Book size:", this);
+    lblSize->setStyleSheet("font-weight: 800;");
+    QComboBox *comboFormat = new QComboBox(this);
+    comboFormat->setStyleSheet("QComboBox { background: #ffffff; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 5px 8px; color: #3b2212; }");
+    for (const auto &format : BOOK_FORMATS) comboFormat->addItem(format.name, format.id);
+    comboFormat->setCurrentIndex(qMax(0, comboFormat->findData(m_project.formatId)));
+    QLabel *lblSizeNote = new QLabel("Changing size keeps everything where it is, so check the bottom of each page afterwards.", this);
+    lblSizeNote->setStyleSheet("color: #7a5c43; font-size: 11px;");
+    connect(comboFormat, &QComboBox::currentIndexChanged, this, [this, comboFormat]() {
+        m_project.formatId = comboFormat->currentData().toString();
+        rebuildList(m_list->currentItem() ? m_list->currentItem()->data(Qt::UserRole).toString() : QString());
+    });
+    sizeRow->addWidget(lblSize);
+    sizeRow->addWidget(comboFormat);
+    sizeRow->addWidget(lblSizeNote, 1);
+    layout->addLayout(sizeRow);
 
     connect(btnEarlier, &QPushButton::clicked, this, [this]() { moveSelected(-1); });
     connect(btnLater, &QPushButton::clicked, this, [this]() { moveSelected(1); });
@@ -162,12 +181,13 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
 
 QPixmap PageSorterDialog::thumbnailFor(const BookSpread &spread) {
     // Captions change with page numbers, so the cache key includes them.
-    const QString key = QString("%1|%2").arg(spread.id).arg(spread.leftPageNum);
+    const QString key = QString("%1|%2|%3").arg(spread.id).arg(spread.leftPageNum).arg(m_project.formatId);
     auto it = m_thumbCache.constFind(key);
     if (it != m_thumbCache.constEnd()) return it.value();
 
     const BookTheme &theme = getThemeById(m_project.themeId);
-    const QPixmap art = SpreadRenderer::thumbnail(theme, spread, SpreadRenderer::spreadRect(), kThumbWidth, m_project.showPageNumbers);
+    const qreal pageHeight = m_project.pageHeight();
+    const QPixmap art = SpreadRenderer::thumbnail(theme, spread, pageHeight, SpreadRenderer::spreadRect(pageHeight), kThumbWidth, m_project.showPageNumbers);
 
     QPixmap pix(art.width(), art.height() + kCaptionHeight);
     pix.fill(Qt::transparent);
@@ -252,6 +272,10 @@ void PageSorterDialog::moveSelected(int delta) {
 
 QList<BookSpread> PageSorterDialog::spreads() const {
     return m_project.spreads;
+}
+
+QString PageSorterDialog::formatId() const {
+    return m_project.formatId;
 }
 
 bool PageSorterDialog::showPageNumbers() const {

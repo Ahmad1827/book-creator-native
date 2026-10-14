@@ -3,7 +3,7 @@
 #include "canvas_items.h"
 #include <QGraphicsScene>
 
-void SpreadRenderer::paint(QPainter &painter, const BookTheme &theme, const BookSpread &spread,
+void SpreadRenderer::paint(QPainter &painter, const BookTheme &theme, const BookSpread &spread, qreal pageHeight,
                            const QRectF &source, const QRectF &target, bool showPageNumbers, bool drawGutter) {
     painter.save();
     painter.setClipRect(target, Qt::IntersectClip);
@@ -11,22 +11,23 @@ void SpreadRenderer::paint(QPainter &painter, const BookTheme &theme, const Book
     painter.scale(target.width() / source.width(), target.height() / source.height());
     painter.translate(-source.topLeft());
 
-    painter.fillRect(spreadRect(), theme.paperBg);
+    // Paper runs under the bleed too, so trimming never leaves a white sliver.
+    painter.fillRect(source.united(spreadRect(pageHeight)), theme.paperBg);
 
     painter.setPen(QPen(theme.borderColor, 2));
     painter.setBrush(Qt::NoBrush);
-    painter.drawRect(leftPageRect().adjusted(12, 12, -12, -12));
-    painter.drawRect(rightPageRect().adjusted(12, 12, -12, -12));
+    painter.drawRect(leftPageRect(pageHeight).adjusted(12, 12, -12, -12));
+    painter.drawRect(rightPageRect(pageHeight).adjusted(12, 12, -12, -12));
 
-    ThemeDecors::draw(&painter, theme);
+    ThemeDecors::draw(&painter, theme, pageHeight);
 
     if (showPageNumbers && !spread.isCover()) {
-        ThemeDecors::drawPageNumbers(&painter, theme, spread.leftPageNum, spread.rightPageNum);
+        ThemeDecors::drawPageNumbers(&painter, theme, spread.leftPageNum, spread.rightPageNum, pageHeight);
     }
 
     if (drawGutter) {
         painter.setPen(QPen(QColor(0, 0, 0, 100), 1));
-        painter.drawLine(QPointF(kPageWidth, 0), QPointF(kPageWidth, kPageHeight));
+        painter.drawLine(QPointF(kPageWidth, 0), QPointF(kPageWidth, pageHeight));
     }
     painter.restore();
 
@@ -35,14 +36,14 @@ void SpreadRenderer::paint(QPainter &painter, const BookTheme &theme, const Book
     scene.render(&painter, target, source, Qt::IgnoreAspectRatio);
 }
 
-QPixmap SpreadRenderer::thumbnail(const BookTheme &theme, const BookSpread &spread, const QRectF &source,
-                                  int width, bool showPageNumbers) {
+QPixmap SpreadRenderer::thumbnail(const BookTheme &theme, const BookSpread &spread, qreal pageHeight,
+                                  const QRectF &source, int width, bool showPageNumbers) {
     const int height = qRound(width * source.height() / source.width());
     QPixmap pix(width, height);
     pix.fill(theme.paperBg);
     QPainter painter(&pix);
     painter.setRenderHint(QPainter::Antialiasing, true);
     painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
-    paint(painter, theme, spread, source, QRectF(0, 0, width, height), showPageNumbers, source.width() > kPageWidth);
+    paint(painter, theme, spread, pageHeight, source, QRectF(0, 0, width, height), showPageNumbers, source.width() > kPageWidth);
     return pix;
 }

@@ -5,6 +5,8 @@
 #include "asset_store.h"
 #include "app_settings.h"
 #include "settings_dialog.h"
+#include "export_dialog.h"
+#include <QApplication>
 #include <QImageReader>
 #include <QUuid>
 #include <QFileDialog>
@@ -224,6 +226,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_toolboxDock, &DrawingToolboxDock::textSizeSelected, m_canvasView, &BookCanvasView::setTextPixelSize);
     connect(m_toolboxDock, &DrawingToolboxDock::textColorSelected, m_canvasView, &BookCanvasView::setTextColor);
     connect(m_toolboxDock, &DrawingToolboxDock::textAlignmentSelected, m_canvasView, &BookCanvasView::setTextAlignment);
+    connect(m_toolboxDock, &DrawingToolboxDock::textEffectSelected, m_canvasView, &BookCanvasView::setTextEffect);
+    connect(m_toolboxDock, &DrawingToolboxDock::textShuffleRequested, m_canvasView, &BookCanvasView::shuffleTextEffect);
     connect(m_layersDock, &LayersDock::applyTemplateRequested, m_canvasView, &BookCanvasView::applyPageTemplate);
 
     connect(m_layersDock, &LayersDock::addLayerRequested, [this]() {
@@ -483,6 +487,7 @@ void MainWindow::openProject(const BookProject &proj) {
         m_comboThemes->setCurrentIndex(themeIndex >= 0 ? themeIndex : 0);
     }
     m_canvasView->setTheme(getThemeById(m_activeProject.themeId));
+    m_canvasView->setPageHeight(m_activeProject.pageHeight());
 
     m_canvasView->clearUndoHistory();
     const auto &firstSpread = m_activeProject.spreads[m_currentSpreadIndex];
@@ -521,7 +526,10 @@ void MainWindow::arrangePages() {
 
     m_activeProject.spreads = dlg.spreads();
     m_activeProject.showPageNumbers = dlg.showPageNumbers();
+    const bool resized = m_activeProject.formatId != dlg.formatId();
+    m_activeProject.formatId = dlg.formatId();
     m_activeProject.renumberPages();
+    m_canvasView->setPageHeight(m_activeProject.pageHeight());
 
     int index = 0;
     for (int i = 0; i < m_activeProject.spreads.size(); ++i) {
@@ -532,6 +540,7 @@ void MainWindow::arrangePages() {
     const auto &spread = m_activeProject.spreads[index];
     m_canvasView->loadSpread(spread.id, spread.canvasData);
     updateNavigationState();
+    if (resized) m_canvasView->fitBookInView();
     saveProjectsToDisk();
 }
 
@@ -700,9 +709,14 @@ void MainWindow::saveProjectsToDisk() {
 }
 
 void MainWindow::exportPdf() {
+    // Commit the open spread so the export and the blurry-picture check see her latest work.
+    saveProjectsToDisk();
+
+    ExportDialog options(m_activeProject, this);
+    if (options.exec() != QDialog::Accepted) return;
+
     QString safeTitle = m_activeProject.title;
     safeTitle.replace(" ", "_");
-
     QString filePath = QFileDialog::getSaveFileName(
         this,
         "Export Storybook to PDF",
@@ -711,22 +725,10 @@ void MainWindow::exportPdf() {
     );
     if (filePath.isEmpty()) return;
 
-    QMessageBox layoutBox(this);
-    layoutBox.setWindowTitle("PDF Layout");
-    layoutBox.setText("How should the pages be laid out?");
-    layoutBox.setInformativeText("Single pages suit printing and binding. Spreads show facing pages side by side, as on screen.");
-    QPushButton *btnSingle = layoutBox.addButton("Single Pages (for printing)", QMessageBox::AcceptRole);
-    QPushButton *btnSpreads = layoutBox.addButton("Two-Page Spreads", QMessageBox::AcceptRole);
-    layoutBox.addButton(QMessageBox::Cancel);
-    layoutBox.setDefaultButton(btnSingle);
-    layoutBox.exec();
-    if (layoutBox.clickedButton() != btnSingle && layoutBox.clickedButton() != btnSpreads) return;
-    const auto layout = layoutBox.clickedButton() == btnSingle ? PdfExporter::Layout::SinglePages : PdfExporter::Layout::Spreads;
-
-    saveProjectsToDisk();
-
     BookTheme theme = getThemeById(m_activeProject.themeId);
-    bool success = PdfExporter::exportProjectToPdf(m_activeProject, theme, layout, filePath);
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    bool success = PdfExporter::exportProjectToPdf(m_activeProject, theme, options.options(), filePath);
+    QApplication::restoreOverrideCursor();
 
     if (success) {
         QMessageBox::information(this, "Export Succeeded", QString("Your book was saved as a PDF with all %1 pages%2.").arg(m_activeProject.pageCount()).arg(m_activeProject.hasCover() ? " plus the covers" : ""));

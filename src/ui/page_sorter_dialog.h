@@ -16,6 +16,7 @@ public:
 
     QList<BookSpread> spreads() const;
     bool showPageNumbers() const;
+    QString formatId() const;
     // The spread to show after closing (the one she double-clicked or last selected).
     QString focusSpreadId() const;
 

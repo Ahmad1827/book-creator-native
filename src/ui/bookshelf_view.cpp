@@ -189,7 +189,7 @@ void BookshelfView::refreshGrid() {
         if (proj.hasCover()) {
             QLabel *coverThumb = new QLabel(card);
             const BookSpread &cover = proj.spreads.first();
-            coverThumb->setPixmap(SpreadRenderer::thumbnail(theme, cover, SpreadRenderer::rightPageRect(), 104, false));
+            coverThumb->setPixmap(SpreadRenderer::thumbnail(theme, cover, proj.pageHeight(), SpreadRenderer::rightPageRect(proj.pageHeight()), 104, false));
             coverThumb->setStyleSheet("border: 1px solid #dcc6ab; border-radius: 0; background: transparent;");
             cardLayout->addWidget(coverThumb, 0, Qt::AlignVCenter);
         }

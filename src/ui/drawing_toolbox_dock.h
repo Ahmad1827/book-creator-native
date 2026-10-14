@@ -34,6 +34,8 @@ signals:
     void textSizeSelected(int pixelSize);
     void textColorSelected(const QColor &color);
     void textAlignmentSelected(Qt::Alignment align);
+    void textEffectSelected(const QString &effect);
+    void textShuffleRequested();
     void bringForwardRequested();
     void sendBackwardRequested();
     void duplicateRequested();

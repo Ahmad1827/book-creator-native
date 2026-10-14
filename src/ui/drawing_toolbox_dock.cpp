@@ -381,13 +381,35 @@ QWidget *DrawingToolboxDock::createShapesPage() {
     layout->setContentsMargins(4, 4, 10, 4);
     layout->setSpacing(8);
 
+    QLabel *lblBubbles = new QLabel("SPEECH BUBBLES", page);
+    lblBubbles->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px;");
+    layout->addWidget(lblBubbles);
+
+    QHBoxLayout *bubbleRow = new QHBoxLayout();
+    bubbleRow->setSpacing(6);
+    struct BubbleEntry { QString id; QString label; };
+    const QList<BubbleEntry> bubbles = {{"speech", "Speech"}, {"thought", "Thought"}, {"shout", "SHOUT!"}};
+    for (const auto &b : bubbles) {
+        QPushButton *btn = new QPushButton(b.label, page);
+        btn->setToolTip("Adds a bubble and lets you type straight into it. Right-click it to flip the tail.");
+        btn->setStyleSheet(
+            "QPushButton { background: #ffffff; border: 2px solid #2c211a; border-radius: 14px; padding: 8px 2px; font-weight: 800; font-size: 11px; color: #2c211a; }"
+            "QPushButton:hover { background: #fdfaf5; border-color: #8b5b32; }"
+        );
+        connect(btn, &QPushButton::clicked, [this, b]() {
+            emit shapeAdded(b.id, m_shapeFill, m_shapeStroke, m_shapeStrokeWidth);
+        });
+        bubbleRow->addWidget(btn);
+    }
+    layout->addLayout(bubbleRow);
+
     QLabel *lblShapes = new QLabel("STORY SHAPES", page);
-    lblShapes->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px;");
+    lblShapes->setStyleSheet("font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px; padding-left: 4px; margin-top: 8px;");
     layout->addWidget(lblShapes);
 
     QGridLayout *grid = new QGridLayout();
     grid->setSpacing(6);
-    QStringList shapes = {"star", "heart", "cloud", "moon", "flower", "speech", "thought", "circle", "rect"};
+    QStringList shapes = {"star", "heart", "cloud", "moon", "flower", "circle", "rect"};
 
     int r = 0, c = 0;
     for (const auto &s : shapes) {
@@ -609,6 +631,47 @@ QWidget *DrawingToolboxDock::createTextPage() {
         if (a.align == Qt::AlignLeft) btn->setChecked(true);
     }
     layout->addLayout(alignRow);
+
+    QLabel *lblEffect = new QLabel("LETTER STYLE", page);
+    lblEffect->setStyleSheet(sectionStyle);
+    layout->addWidget(lblEffect);
+
+    QGridLayout *effectGrid = new QGridLayout();
+    effectGrid->setSpacing(6);
+    QButtonGroup *effectGroup = new QButtonGroup(page);
+    effectGroup->setExclusive(true);
+    struct EffectEntry { QString id; QString label; QString tip; };
+    const QList<EffectEntry> effects = {
+        {"none", "Plain", "Ordinary neat letters"},
+        {"wobbly", "Wobbly", "Hand-lettered, every letter a little tipsy"},
+        {"bouncy", "Bouncy", "Letters bob up and down like a song"},
+        {"shouty", "SHOUTY", "Big and small letters tumbling about, for noisy words"},
+        {"rainbow", "Rainbow", "Every letter a different colour"},
+    };
+    for (int i = 0; i < effects.size(); ++i) {
+        const auto e = effects[i];
+        QPushButton *btn = new QPushButton(e.label, page);
+        btn->setCheckable(true);
+        btn->setToolTip(e.tip + ". Shows once you click away from the text.");
+        btn->setStyleSheet(
+            "QPushButton { background: #f3e9d8; border: 1.5px solid #d4be9f; border-radius: 6px; padding: 7px 0; font-weight: 800; color: #3b2212; }"
+            "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+            "QPushButton:checked { background: #3b2212; color: #fbf5ea; border-color: #3b2212; }"
+        );
+        effectGroup->addButton(btn);
+        connect(btn, &QPushButton::clicked, this, [this, e]() { emit textEffectSelected(e.id); });
+        effectGrid->addWidget(btn, i / 3, i % 3);
+        if (e.id == "none") btn->setChecked(true);
+    }
+    QPushButton *btnShuffle = new QPushButton("Shuffle", page);
+    btnShuffle->setToolTip("Give the selected lettering a fresh jiggle");
+    btnShuffle->setStyleSheet(
+        "QPushButton { background: #fdfaf5; border: 1.5px dashed #bda383; border-radius: 6px; padding: 7px 0; font-weight: 800; color: #3b2212; }"
+        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
+    );
+    connect(btnShuffle, &QPushButton::clicked, this, &DrawingToolboxDock::textShuffleRequested);
+    effectGrid->addWidget(btnShuffle, 1, 2);
+    layout->addLayout(effectGrid);
 
     QLabel *lblColor = new QLabel("INK COLOUR", page);
     lblColor->setStyleSheet(sectionStyle);

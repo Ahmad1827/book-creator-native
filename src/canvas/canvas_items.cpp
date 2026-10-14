@@ -1,6 +1,10 @@
 #include "canvas_items.h"
 #include "asset_store.h"
 #include <QPainter>
+#include <QStyleOptionGraphicsItem>
+#include <QTextBlock>
+#include <QTextLayout>
+#include <QAbstractTextDocumentLayout>
 #include <QGraphicsRectItem>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsPixmapItem>
@@ -132,6 +136,32 @@ Qt::Alignment alignmentFromString(const QString &s) {
     if (s == "center") return Qt::AlignHCenter;
     if (s == "right") return Qt::AlignRight;
     return Qt::AlignLeft;
+}
+
+// A stable pseudo-random value in [-1, 1] for one letter, so lettering never "re-jiggles".
+qreal letterJitter(quint32 seed, int index, int channel) {
+    quint32 h = seed * 2654435761u ^ (quint32(index) * 2246822519u) ^ (quint32(channel + 1) * 3266489917u);
+    h ^= h >> 15;
+    h *= 2246822519u;
+    h ^= h >> 13;
+    h *= 3266489917u;
+    h ^= h >> 16;
+    return (h / 4294967295.0) * 2.0 - 1.0;
+}
+
+QJsonObject textToJson(const StoryTextItem *text) {
+    QJsonObject obj;
+    obj["text"] = text->toPlainText();
+    obj["font"] = text->fontFamily();
+    obj["size"] = text->pixelSize();
+    obj["color"] = text->defaultTextColor().name(QColor::HexArgb);
+    obj["align"] = alignmentToString(text->alignment());
+    obj["width"] = text->textWidth();
+    if (text->effect() != "none") {
+        obj["effect"] = text->effect();
+        obj["seed"] = qint64(text->seed());
+    }
+    return obj;
 }
 
 } // namespace
@@ -274,6 +304,125 @@ bool StoryTextItem::isEditing() const {
     return textInteractionFlags() & Qt::TextEditable;
 }
 
+void StoryTextItem::setEffect(const QString &effect) {
+    if (effect == m_effect) return;
+    prepareGeometryChange();
+    m_effect = effect.isEmpty() ? QString("none") : effect;
+    update();
+}
+
+void StoryTextItem::setSeed(quint32 seed) {
+    m_seed = seed;
+    update();
+}
+
+QRectF StoryTextItem::boundingRect() const {
+    const QRectF rect = QGraphicsTextItem::boundingRect();
+    if (m_effect == "none") return rect;
+    // Tilted and enlarged letters poke out of the text box a little.
+    const qreal margin = pixelSize() * 0.4;
+    return rect.adjusted(-margin, -margin, margin, margin);
+}
+
+QPainterPath StoryTextItem::shape() const {
+    QPainterPath path;
+    path.addRect(boundingRect());
+    return path;
+}
+
+void StoryTextItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) {
+    // While typing, show plain text so the cursor lines up with the letters.
+    if (m_effect == "none" || isEditing()) {
+        QGraphicsTextItem::paint(painter, option, widget);
+        return;
+    }
+    paintLettering(painter);
+    if (option->state & QStyle::State_Selected) {
+        painter->save();
+        QPen pen(QColor(0, 0, 0, 140), 0, Qt::DashLine);
+        painter->setPen(pen);
+        painter->setBrush(Qt::NoBrush);
+        painter->drawRect(QGraphicsTextItem::boundingRect());
+        painter->restore();
+    }
+}
+
+void StoryTextItem::paintLettering(QPainter *painter) {
+    static const QList<QColor> rainbow = {
+        QColor("#e5446d"), QColor("#f28c28"), QColor("#e9b824"), QColor("#4caf6a"), QColor("#3d8bd9"), QColor("#8e5bd1")
+    };
+
+    QTextDocument *doc = document();
+    QAbstractTextDocumentLayout *docLayout = doc->documentLayout();
+    const qreal size = pixelSize();
+
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setRenderHint(QPainter::TextAntialiasing, true);
+    painter->setFont(font());
+
+    int index = 0;
+    for (QTextBlock block = doc->begin(); block.isValid(); block = block.next()) {
+        QTextLayout *layout = block.layout();
+        if (!layout) continue;
+        const QPointF blockPos = docLayout->blockBoundingRect(block).topLeft();
+        const QString text = block.text();
+
+        for (int l = 0; l < layout->lineCount(); ++l) {
+            const QTextLine line = layout->lineAt(l);
+            const int start = line.textStart();
+            const int end = start + line.textLength();
+            const qreal baseline = blockPos.y() + line.y() + line.ascent();
+
+            for (int i = start; i < end;) {
+                const int len = (text.at(i).isHighSurrogate() && i + 1 < end) ? 2 : 1;
+                const QString letter = text.mid(i, len);
+                const qreal x0 = blockPos.x() + line.cursorToX(i);
+                const qreal x1 = blockPos.x() + line.cursorToX(i + len);
+                i += len;
+                if (letter.trimmed().isEmpty()) {
+                    ++index;
+                    continue;
+                }
+
+                qreal rotation = 0.0;
+                qreal lift = 0.0;
+                qreal scale = 1.0;
+                QColor color = defaultTextColor();
+                if (m_effect == "wobbly") {
+                    rotation = letterJitter(m_seed, index, 0) * 7.0;
+                    lift = letterJitter(m_seed, index, 1) * 0.06 * size;
+                } else if (m_effect == "bouncy") {
+                    const qreal phase = index * 0.8 + (m_seed % 7);
+                    lift = qSin(phase) * 0.13 * size;
+                    rotation = qCos(phase) * 9.0;
+                } else if (m_effect == "shouty") {
+                    scale = 1.1 + letterJitter(m_seed, index, 2) * 0.28;
+                    rotation = letterJitter(m_seed, index, 0) * 14.0;
+                    lift = letterJitter(m_seed, index, 1) * 0.1 * size;
+                } else if (m_effect == "rainbow") {
+                    rotation = letterJitter(m_seed, index, 0) * 5.0;
+                    lift = letterJitter(m_seed, index, 1) * 0.05 * size;
+                    color = rainbow[(index + int(m_seed % rainbow.size())) % rainbow.size()];
+                }
+
+                // Pivot around the middle of the letter so it tilts in place.
+                const qreal halfWidth = (x1 - x0) / 2.0;
+                const qreal midHeight = size * 0.35;
+                painter->save();
+                painter->translate(x0 + halfWidth, baseline + lift - midHeight);
+                painter->rotate(rotation);
+                painter->scale(scale, scale);
+                painter->setPen(color);
+                painter->drawText(QPointF(-halfWidth, midHeight), letter);
+                painter->restore();
+                ++index;
+            }
+        }
+    }
+    painter->restore();
+}
+
 void StoryTextItem::focusOutEvent(QFocusEvent *event) {
     QGraphicsTextItem::focusOutEvent(event);
 
@@ -286,6 +435,98 @@ void StoryTextItem::focusOutEvent(QFocusEvent *event) {
     setTextCursor(cursor);
     setTextInteractionFlags(Qt::NoTextInteraction);
     emit editingFinished(this);
+}
+
+// ---------------------------------------------------------------------------
+// BubbleItem
+
+BubbleItem::BubbleItem(const QString &kind, const QSizeF &size, bool flipped)
+    : m_kind(kind),
+      m_size(size),
+      m_flipped(flipped),
+      m_text(new StoryTextItem(this)) {
+    setPath(bubblePath(kind, size, flipped));
+    setPen(QPen(QColor("#2c211a"), 2.5, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    setBrush(QColor("#ffffff"));
+
+    m_text->setStyle("Patrick Hand", kind == "shout" ? 26 : 22, QColor("#2c211a"), Qt::AlignHCenter);
+    m_text->setTextWidth(bodyRect(kind, size).width() * 0.8);
+    // Keep the words centred in the bubble as she types.
+    QObject::connect(m_text->document()->documentLayout(), &QAbstractTextDocumentLayout::documentSizeChanged,
+                     m_text, [this]() { layoutText(); });
+    layoutText();
+}
+
+void BubbleItem::setFlipped(bool flipped) {
+    m_flipped = flipped;
+    setPath(bubblePath(m_kind, m_size, m_flipped));
+    layoutText();
+}
+
+QRectF BubbleItem::bodyRect(const QString &kind, const QSizeF &size) {
+    const qreal w = size.width();
+    const qreal h = size.height();
+    if (kind == "thought") return QRectF(0, 0, w, h * 0.74);
+    if (kind == "shout") return QRectF(w * 0.14, h * 0.2, w * 0.72, h * 0.6);
+    return QRectF(0, 0, w, h * 0.78);
+}
+
+QPainterPath BubbleItem::bubblePath(const QString &kind, const QSizeF &size, bool flipped) {
+    const qreal w = size.width();
+    const qreal h = size.height();
+    const QRectF body = bodyRect(kind, size);
+    QPainterPath path;
+
+    if (kind == "shout") {
+        // A jagged starburst for BIG noisy words.
+        const QPointF c(w / 2, h / 2);
+        const int spikes = 14;
+        QPolygonF star;
+        for (int i = 0; i < spikes * 2; ++i) {
+            const qreal a = M_PI * i / spikes - M_PI / 2;
+            const bool outer = i % 2 == 0;
+            const qreal wobble = outer ? 0.88 + 0.12 * ((i * 37) % 5) / 4.0 : 0.72;
+            star << QPointF(c.x() + qCos(a) * w / 2 * wobble, c.y() + qSin(a) * h / 2 * wobble);
+        }
+        path.addPolygon(star);
+        path.closeSubpath();
+        return path;
+    }
+
+    if (kind == "thought") {
+        // A cloud: overlapping puffs around an oval, plus a trail of little bubbles.
+        path.addEllipse(body.adjusted(body.width() * 0.08, body.height() * 0.12, -body.width() * 0.08, -body.height() * 0.12));
+        const int puffs = 10;
+        for (int i = 0; i < puffs; ++i) {
+            const qreal a = 2 * M_PI * i / puffs;
+            const QPointF p(body.center().x() + qCos(a) * body.width() * 0.38, body.center().y() + qSin(a) * body.height() * 0.32);
+            const qreal r = body.height() * 0.24;
+            QPainterPath puff;
+            puff.addEllipse(p, r * 1.15, r);
+            path = path.united(puff);
+        }
+        QPainterPath trail;
+        trail.addEllipse(QPointF(w * 0.24, h * 0.85), h * 0.06, h * 0.05);
+        trail.addEllipse(QPointF(w * 0.13, h * 0.96), h * 0.035, h * 0.03);
+        path.addPath(trail);
+    } else {
+        path.addEllipse(body);
+        QPolygonF tail;
+        tail << QPointF(w * 0.26, h * 0.68) << QPointF(w * 0.44, h * 0.74) << QPointF(w * 0.1, h);
+        QPainterPath tailPath;
+        tailPath.addPolygon(tail);
+        tailPath.closeSubpath();
+        path = path.united(tailPath);
+    }
+
+    if (flipped) path = QTransform(-1, 0, 0, 1, w, 0).map(path);
+    return path;
+}
+
+void BubbleItem::layoutText() {
+    const QRectF body = bodyRect(m_kind, m_size);
+    const QRectF textRect = m_text->QGraphicsTextItem::boundingRect();
+    m_text->setPos(body.center().x() - textRect.width() / 2, body.center().y() - textRect.height() / 2);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,13 +580,17 @@ QJsonObject CanvasSerializer::itemToJson(const QGraphicsItem *item) {
         }
         obj["samples"] = samples;
     } else if (auto *text = dynamic_cast<const StoryTextItem*>(item)) {
+        obj = textToJson(text);
         obj["type"] = "text";
-        obj["text"] = text->toPlainText();
-        obj["font"] = text->fontFamily();
-        obj["size"] = text->pixelSize();
-        obj["color"] = text->defaultTextColor().name(QColor::HexArgb);
-        obj["align"] = alignmentToString(text->alignment());
-        obj["width"] = text->textWidth();
+    } else if (auto *bubble = dynamic_cast<const BubbleItem*>(item)) {
+        obj["type"] = "bubble";
+        obj["kind"] = bubble->kind();
+        obj["w"] = bubble->size().width();
+        obj["h"] = bubble->size().height();
+        if (bubble->isFlipped()) obj["flipped"] = true;
+        obj["pen"] = penToJson(bubble->pen());
+        obj["fill"] = brushToJson(bubble->brush());
+        obj["text"] = textToJson(bubble->textItem());
     } else if (auto *image = dynamic_cast<const ImageItem*>(item)) {
         obj["type"] = "image";
         obj["asset"] = image->assetId();
@@ -409,10 +654,16 @@ QGraphicsItem *CanvasSerializer::itemFromJson(const QJsonObject &obj) {
         item = stroke;
     } else if (type == "text") {
         auto *text = new StoryTextItem();
-        text->setStyle(obj["font"].toString(), obj["size"].toInt(28), QColor(obj["color"].toString()), alignmentFromString(obj["align"].toString()));
-        text->setTextWidth(obj["width"].toDouble(400));
-        text->setPlainText(obj["text"].toString());
+        applyTextJson(text, obj);
         item = text;
+    } else if (type == "bubble") {
+        auto *bubble = new BubbleItem(obj["kind"].toString("speech"),
+                                      QSizeF(obj["w"].toDouble(220), obj["h"].toDouble(150)),
+                                      obj["flipped"].toBool(false));
+        bubble->setPen(penFromJson(obj["pen"].toObject()));
+        bubble->setBrush(brushFromJson(obj["fill"]));
+        applyTextJson(bubble->textItem(), obj["text"].toObject());
+        item = bubble;
     } else if (type == "path") {
         QPainterPath path = pathFromJson(obj["path"].toArray());
         path.setFillRule(Qt::FillRule(obj["fillRule"].toInt(int(Qt::OddEvenFill))));
@@ -466,6 +717,15 @@ QGraphicsItem *CanvasSerializer::itemFromJson(const QJsonObject &obj) {
     ensureId(item);
 
     return item;
+}
+
+void CanvasSerializer::applyTextJson(StoryTextItem *text, const QJsonObject &obj) {
+    text->setStyle(obj["font"].toString("Patrick Hand"), obj["size"].toInt(28),
+                   QColor(obj["color"].toString("#ff2c211a")), alignmentFromString(obj["align"].toString()));
+    text->setTextWidth(obj["width"].toDouble(400));
+    text->setPlainText(obj["text"].toString());
+    text->setEffect(obj["effect"].toString("none"));
+    text->setSeed(quint32(obj["seed"].toInteger(1)));
 }
 
 QJsonObject CanvasSerializer::sceneToJson(const QGraphicsScene *scene) {

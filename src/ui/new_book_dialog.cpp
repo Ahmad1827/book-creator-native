@@ -49,6 +49,15 @@ void NewBookDialog::setupUi() {
     authorLayout->addWidget(m_editAuthor);
     fieldsLayout->addLayout(authorLayout);
 
+    QVBoxLayout *formatLayout = new QVBoxLayout();
+    formatLayout->setSpacing(4);
+    formatLayout->addWidget(new QLabel("BOOK SIZE", this));
+    m_comboFormat = new QComboBox(this);
+    for (const auto &format : BOOK_FORMATS) m_comboFormat->addItem(format.name, format.id);
+    m_comboFormat->setToolTip("The printed page size. Square 8.5 in is the most common picture-book size.");
+    formatLayout->addWidget(m_comboFormat);
+    fieldsLayout->addLayout(formatLayout);
+
     mainLayout->addLayout(fieldsLayout);
 
     QLabel *lblTheme = new QLabel("CHOOSE BOOK THEME & CORNERS", this);
@@ -147,6 +156,7 @@ BookProject NewBookDialog::createProject() const {
     proj.title = m_editTitle->text().trimmed();
     proj.author = m_editAuthor->text().trimmed().isEmpty() ? "Author" : m_editAuthor->text().trimmed();
     proj.themeId = m_selectedThemeId;
+    proj.formatId = m_comboFormat->currentData().toString();
     proj.createdAt = QDate::currentDate().toString("MM/dd/yyyy");
 
     BookSpread s1;

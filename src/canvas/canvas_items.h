@@ -78,11 +78,55 @@ public:
     void beginEditing();
     bool isEditing() const;
 
+    // Hand-lettered looks: "none", "wobbly", "bouncy", "shouty" or "rainbow". Each box has
+    // its own seed so the jiggle stays the same every time the page is drawn.
+    void setEffect(const QString &effect);
+    QString effect() const { return m_effect; }
+    void setSeed(quint32 seed);
+    quint32 seed() const { return m_seed; }
+
+    QRectF boundingRect() const override;
+    QPainterPath shape() const override;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget) override;
+
 signals:
     void editingFinished(StoryTextItem *item);
 
 protected:
     void focusOutEvent(QFocusEvent *event) override;
+
+private:
+    void paintLettering(QPainter *painter);
+
+    QString m_effect = "none";
+    quint32 m_seed = 1;
+};
+
+// A speech, thought or shout bubble that carries its own text box.
+class BubbleItem : public QGraphicsPathItem {
+public:
+    enum { Type = UserType + 4 };
+
+    BubbleItem(const QString &kind, const QSizeF &size, bool flipped);
+
+    int type() const override { return Type; }
+    QString kind() const { return m_kind; }
+    QSizeF size() const { return m_size; }
+    bool isFlipped() const { return m_flipped; }
+    void setFlipped(bool flipped);
+    StoryTextItem *textItem() const { return m_text; }
+
+    static QPainterPath bubblePath(const QString &kind, const QSizeF &size, bool flipped);
+    // The part of the bubble the words sit in (excluding the tail).
+    static QRectF bodyRect(const QString &kind, const QSizeF &size);
+
+private:
+    void layoutText();
+
+    QString m_kind;
+    QSizeF m_size;
+    bool m_flipped;
+    StoryTextItem *m_text;
 };
 
 // A picture from the AssetStore (imported artwork or a sticker).
@@ -106,6 +150,9 @@ namespace CanvasSerializer {
     // Returns an empty object for items that are not part of the saved artwork.
     QJsonObject itemToJson(const QGraphicsItem *item);
     QGraphicsItem *itemFromJson(const QJsonObject &obj);
+
+    // Shared by plain text boxes and the text inside bubbles.
+    void applyTextJson(StoryTextItem *text, const QJsonObject &obj);
 
     QJsonObject sceneToJson(const QGraphicsScene *scene);
     QList<QGraphicsItem*> loadIntoScene(QGraphicsScene *scene, const QJsonObject &canvasData);
