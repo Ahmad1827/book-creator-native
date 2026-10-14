@@ -2,6 +2,7 @@
 #include <QDirIterator>
 #include <QFontDatabase>
 #include "main_window.h"
+#include "sketch.h"
 
 int main(int argc, char *argv[]) {
     QApplication app(argc, argv);
@@ -11,6 +12,8 @@ int main(int argc, char *argv[]) {
     while (fonts.hasNext()) {
         QFontDatabase::addApplicationFont(fonts.next());
     }
+
+    Sketch::install();
 
     MainWindow window;
     window.show();

@@ -1,4 +1,5 @@
 #include "new_book_dialog.h"
+#include "sketch.h"
 #include <QDateTime>
 
 NewBookDialog::NewBookDialog(QWidget *parent)
@@ -7,25 +8,17 @@ NewBookDialog::NewBookDialog(QWidget *parent)
 }
 
 void NewBookDialog::setupUi() {
-    setWindowTitle("New Story Notebook");
-    setFixedSize(620, 560);
-    setStyleSheet(
-        "QDialog { background: #fbf5ea; color: #3b2212; }"
-        "QLabel { color: #3b2212; font-weight: bold; font-size: 11px; }"
-        "QLineEdit { background: #ffffff; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 8px 10px; color: #3b2212; font-size: 12px; font-weight: 600; }"
-        "QLineEdit:focus { border-color: #8b5b32; }"
-        "QPushButton { background: #fbf5ea; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 7px 16px; font-weight: 800; color: #3b2212; font-size: 12px; }"
-        "QPushButton:hover { background: #ffffff; }"
-    );
+    setWindowTitle("A Brand New Book");
+    setFixedSize(720, 640);
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(24, 20, 24, 20);
     mainLayout->setSpacing(14);
 
-    QLabel *lblHeading = new QLabel("Create New Storybook", this);
-    lblHeading->setStyleSheet("font-size: 18px; font-weight: 900; color: #3b2212;");
-    QLabel *lblSub = new QLabel("Configure your title, dedication author, and book aesthetic theme.", this);
-    lblSub->setStyleSheet("font-size: 11px; color: #7a5c43; font-weight: normal;");
+    QLabel *lblHeading = new QLabel("A Brand New Book!", this);
+    lblHeading->setFont(Sketch::titleFont(34));
+    QLabel *lblSub = new QLabel("Give it a name, choose its size and pick a look. You can change the look later.", this);
+    Sketch::styleHint(lblSub);
 
     mainLayout->addWidget(lblHeading);
     mainLayout->addWidget(lblSub);
@@ -35,7 +28,7 @@ void NewBookDialog::setupUi() {
 
     QVBoxLayout *titleLayout = new QVBoxLayout();
     titleLayout->setSpacing(4);
-    titleLayout->addWidget(new QLabel("NOTEBOOK TITLE *", this));
+    titleLayout->addWidget(Sketch::section("Title", this));
     m_editTitle = new QLineEdit(this);
     m_editTitle->setPlaceholderText("e.g. The Fox & The Firefly");
     titleLayout->addWidget(m_editTitle);
@@ -43,15 +36,15 @@ void NewBookDialog::setupUi() {
 
     QVBoxLayout *authorLayout = new QVBoxLayout();
     authorLayout->setSpacing(4);
-    authorLayout->addWidget(new QLabel("AUTHOR / DEDICATION", this));
+    authorLayout->addWidget(Sketch::section("Written by", this));
     m_editAuthor = new QLineEdit(this);
-    m_editAuthor->setPlaceholderText("e.g. For our son");
+    m_editAuthor->setPlaceholderText("e.g. Mum");
     authorLayout->addWidget(m_editAuthor);
     fieldsLayout->addLayout(authorLayout);
 
     QVBoxLayout *formatLayout = new QVBoxLayout();
     formatLayout->setSpacing(4);
-    formatLayout->addWidget(new QLabel("BOOK SIZE", this));
+    formatLayout->addWidget(Sketch::section("Book size", this));
     m_comboFormat = new QComboBox(this);
     for (const auto &format : BOOK_FORMATS) m_comboFormat->addItem(format.name, format.id);
     m_comboFormat->setToolTip("The printed page size. Square 8.5 in is the most common picture-book size.");
@@ -60,7 +53,7 @@ void NewBookDialog::setupUi() {
 
     mainLayout->addLayout(fieldsLayout);
 
-    QLabel *lblTheme = new QLabel("CHOOSE BOOK THEME & CORNERS", this);
+    QLabel *lblTheme = Sketch::section("Pick a look", this);
     mainLayout->addWidget(lblTheme);
 
     QScrollArea *scroll = new QScrollArea(this);
@@ -81,31 +74,28 @@ void NewBookDialog::setupUi() {
 
         QPushButton *btn = new QPushButton(themeContainer);
         btn->setCheckable(true);
-        btn->setFixedHeight(74);
+        btn->setFixedHeight(86);
 
-        QString qss = QString(
-            "QPushButton { background: #fdfaf5; border: 2px solid #dcc6ab; border-radius: 8px; text-align: left; padding: 6px; } "
-            "QPushButton:hover { border-color: #8b5b32; background: #ffffff; } "
-            "QPushButton:checked { border-color: #8b5b32; background: #faede0; }"
-        );
-        btn->setStyleSheet(qss);
+        btn->setProperty("role", "card");
 
         QHBoxLayout *itemLayout = new QHBoxLayout(btn);
         itemLayout->setContentsMargins(6, 4, 6, 4);
         itemLayout->setSpacing(10);
 
-        QFrame *spinePreview = new QFrame(btn);
-        spinePreview->setFixedSize(36, 50);
-        spinePreview->setStyleSheet(QString("background: %1; border-radius: 4px; border: 1px solid #1c0e07;").arg(theme.spineColor.name()));
+        QLabel *spinePreview = new QLabel(btn);
+        spinePreview->setFixedSize(46, 62);
+        spinePreview->setPixmap(Sketch::spinePicture(theme.spineColor, theme.paperBg, theme.accentColor, QSize(46, 62)));
+        spinePreview->setAttribute(Qt::WA_TransparentForMouseEvents);
 
         QVBoxLayout *textLayout = new QVBoxLayout();
         textLayout->setContentsMargins(0, 0, 0, 0);
         textLayout->setSpacing(2);
 
         QLabel *tName = new QLabel(theme.name, btn);
-        tName->setStyleSheet("font-size: 11px; font-weight: 800; color: #3b2212; background: transparent;");
+        tName->setFont(Sketch::headingFont(19));
         QLabel *tTag = new QLabel(theme.tagline, btn);
-        tTag->setStyleSheet("font-size: 9px; color: #7a5c43; background: transparent;");
+        Sketch::styleHint(tTag);
+        tTag->setFont(Sketch::bodyFont(13));
         tTag->setWordWrap(true);
 
         textLayout->addWidget(tName);
@@ -137,8 +127,8 @@ void NewBookDialog::setupUi() {
     QPushButton *btnCancel = new QPushButton("Cancel", this);
     connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
 
-    QPushButton *btnSubmit = new QPushButton("Open Notebook", this);
-    btnSubmit->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); border: 1.5px solid #8c633f; border-radius: 6px; padding: 7px 20px; font-weight: 900; color: #3b2212;");
+    QPushButton *btnSubmit = new QPushButton("Make My Book!", this);
+    btnSubmit->setProperty("role", "primary");
     connect(btnSubmit, &QPushButton::clicked, [this]() {
         if (!m_editTitle->text().trimmed().isEmpty()) {
             accept();

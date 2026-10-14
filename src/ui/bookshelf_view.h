@@ -28,9 +28,13 @@ signals:
     void exportJsonRequested(const BookProject &project);
     void settingsRequested();
 
+protected:
+    void resizeEvent(QResizeEvent *event) override;
+
 private:
     void setupUi();
     void refreshGrid();
+    int columnsForWidth() const;
 
     QLineEdit *m_editSearch;
     QWidget *m_gridContainer;
@@ -38,4 +42,6 @@ private:
     QLabel *m_lblCount;
 
     QList<BookProject> m_projects;
+    QScrollArea *m_scroll = nullptr;
+    int m_columns = 0;
 };

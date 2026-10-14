@@ -24,7 +24,9 @@ inline const QList<FontDescriptor> FONTS = {
     {"Comfortaa", "Modern"},
     {"Quicksand", "Modern"},
     {"Lora", "Classic"},
-    {"Amatic SC", "Whimsical"}
+    {"Amatic SC", "Whimsical"},
+    {"Henny Penny", "Whimsical"},
+    {"Gochi Hand", "Handwritten"}
 };
 
 inline const QList<BookTheme> THEMES = {

@@ -41,7 +41,7 @@ private:
     void animatePanel(bool open);
 
     QPushButton *m_handleBtn;
-    QFrame *m_contentFrame;
+    QWidget *m_contentFrame;
     bool m_isOpen = true;
 
     QStackedWidget *m_tabStack;

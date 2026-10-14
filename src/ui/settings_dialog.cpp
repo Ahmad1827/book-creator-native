@@ -1,4 +1,5 @@
 #include "settings_dialog.h"
+#include "sketch.h"
 #include "app_settings.h"
 #include "story_helper.h"
 #include <QVBoxLayout>
@@ -13,22 +14,13 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent) {
     setWindowTitle("Settings");
     setMinimumWidth(700);
-    setStyleSheet(
-        "QDialog { background: #fbf5ea; }"
-        "QLabel, QRadioButton { color: #3b2212; }"
-        "QGroupBox { color: #3b2212; font-weight: 800; border: 1.5px solid #dcc6ab; border-radius: 8px; margin-top: 14px; padding: 14px 12px 10px 12px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
-        "QLineEdit, QComboBox { background: #ffffff; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 5px 8px; color: #3b2212; }"
-        "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 6px 14px; font-weight: 800; color: #3b2212; }"
-        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
-    );
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 16);
     layout->setSpacing(10);
 
     QLabel *title = new QLabel("Settings", this);
-    title->setStyleSheet("font-size: 18px; font-weight: 900;");
+    title->setFont(Sketch::titleFont(32));
     layout->addWidget(title);
 
     QGroupBox *helperBox = new QGroupBox("Story Helper", this);
@@ -44,7 +36,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
         "When you press a helper button, the text you're working on and the words already in your book "
         "are sent to Claude through Claude Code, using your Claude Code sign-in. Nothing is sent otherwise.", helperBox);
     privacy->setWordWrap(true);
-    privacy->setStyleSheet("color: #7a5c43; font-size: 11px;");
+    Sketch::styleHint(privacy);
     helperLayout->addWidget(privacy);
 
     QFormLayout *form = new QFormLayout();
@@ -77,7 +69,8 @@ SettingsDialog::SettingsDialog(QWidget *parent)
 
     m_lblStatus = new QLabel(helperBox);
     m_lblStatus->setWordWrap(true);
-    m_lblStatus->setStyleSheet("font-size: 11px; font-weight: 700;");
+    Sketch::styleHint(m_lblStatus);
+    Sketch::setTextColor(m_lblStatus, Sketch::kInkSoft);
     helperLayout->addWidget(m_lblStatus);
 
     layout->addWidget(helperBox);
@@ -88,7 +81,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     QPushButton *btnCancel = new QPushButton("Cancel", this);
     QPushButton *btnSave = new QPushButton("Save", this);
     btnSave->setDefault(true);
-    btnSave->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); border: 1.5px solid #8c633f; padding: 7px 22px; }");
+    btnSave->setProperty("role", "primary");
     footer->addWidget(btnCancel);
     footer->addWidget(btnSave);
     layout->addLayout(footer);
@@ -138,7 +131,8 @@ void SettingsDialog::refreshDetectedPath() {
 
 void SettingsDialog::testClaude() {
     const QString path = StoryHelper::resolveClaudePath(m_editClaudePath->text().trimmed());
-    m_lblStatus->setStyleSheet("font-size: 11px; font-weight: 700; color: #7a5c43;");
+    Sketch::styleHint(m_lblStatus);
+    Sketch::setTextColor(m_lblStatus, Sketch::kInkSoft);
     m_lblStatus->setText("Checking…");
     QApplication::setOverrideCursor(Qt::WaitCursor);
     QApplication::processEvents();
@@ -147,10 +141,10 @@ void SettingsDialog::testClaude() {
     QApplication::restoreOverrideCursor();
 
     if (ok) {
-        m_lblStatus->setStyleSheet("font-size: 11px; font-weight: 700; color: #3a6b35;");
+        Sketch::setTextColor(m_lblStatus, QColor("#2f7a3a"));
         m_lblStatus->setText(QString("✓ Ready: %1\nIf the helper says you're not signed in, run \"claude\" once in a terminal to sign in.").arg(message));
     } else {
-        m_lblStatus->setStyleSheet("font-size: 11px; font-weight: 700; color: #b91c1c;");
+        Sketch::setTextColor(m_lblStatus, Sketch::kTomato.darker(140));
         m_lblStatus->setText(message);
     }
 }

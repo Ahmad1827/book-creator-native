@@ -1,4 +1,5 @@
 #include "story_helper_dialog.h"
+#include "sketch.h"
 #include "book_canvas_view.h"
 #include "app_settings.h"
 #include <QVBoxLayout>
@@ -18,18 +19,7 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
     setWindowTitle("Story Helper");
     setModal(false);
     resize(460, 720);
-    setStyleSheet(
-        "QDialog { background: #fbf5ea; }"
-        "QLabel { color: #3b2212; }"
-        "QPlainTextEdit, QLineEdit { background: #ffffff; border: 1.5px solid #dcc6ab; border-radius: 8px; padding: 6px; color: #3b2212; font-size: 13px; }"
-        "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 7px 10px; font-weight: 800; color: #3b2212; }"
-        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
-        "QPushButton:disabled { color: #b9a58f; }"
-        "QProgressBar { border: none; background: #ecd9bf; border-radius: 3px; max-height: 6px; }"
-        "QProgressBar::chunk { background: #8b5b32; border-radius: 3px; }"
-    );
 
-    const QString sectionStyle = "font-size: 10px; font-weight: 800; color: #8c633f; letter-spacing: 0.5px;";
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(16, 14, 16, 14);
@@ -37,9 +27,9 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
 
     QHBoxLayout *header = new QHBoxLayout();
     QLabel *title = new QLabel("Story Helper", this);
-    title->setStyleSheet("font-size: 18px; font-weight: 900;");
+    title->setFont(Sketch::titleFont(30));
     QPushButton *btnSettings = new QPushButton("Settings…", this);
-    btnSettings->setStyleSheet("QPushButton { background: transparent; border: none; color: #8b5b32; text-decoration: underline; padding: 2px; }");
+    btnSettings->setProperty("role", "ghost");
     connect(btnSettings, &QPushButton::clicked, this, &StoryHelperDialog::settingsRequested);
     header->addWidget(title);
     header->addStretch();
@@ -48,14 +38,14 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
 
     QLabel *sub = new QLabel("Ideas from Claude, through Claude Code on this computer. Take what you like and change the rest!", this);
     sub->setWordWrap(true);
-    sub->setStyleSheet("color: #7a5c43; font-size: 11px;");
+    Sketch::styleHint(sub);
     layout->addWidget(sub);
 
     QHBoxLayout *passageHeader = new QHBoxLayout();
     QLabel *lblPassage = new QLabel("YOUR TEXT", this);
-    lblPassage->setStyleSheet(sectionStyle);
+    Sketch::styleSection(lblPassage);
     QPushButton *btnPull = new QPushButton("Use Selected Text Box", this);
-    btnPull->setStyleSheet("QPushButton { padding: 3px 8px; font-size: 10px; }");
+    btnPull->setFont(Sketch::headingFont(15));
     connect(btnPull, &QPushButton::clicked, this, &StoryHelperDialog::pullSelectedText);
     passageHeader->addWidget(lblPassage);
     passageHeader->addStretch();
@@ -88,7 +78,7 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
     layout->addLayout(grid);
 
     QLabel *lblCustom = new QLabel("OR ASK ANYTHING", this);
-    lblCustom->setStyleSheet(sectionStyle + " margin-top: 4px;");
+    Sketch::styleSection(lblCustom);
     layout->addWidget(lblCustom);
     QHBoxLayout *customRow = new QHBoxLayout();
     m_editCustom = new QLineEdit(this);
@@ -104,7 +94,8 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
     QHBoxLayout *statusRow = new QHBoxLayout();
     m_lblStatus = new QLabel(this);
     m_lblStatus->setWordWrap(true);
-    m_lblStatus->setStyleSheet("font-size: 11px; color: #7a5c43;");
+    Sketch::styleHint(m_lblStatus);
+    Sketch::setTextColor(m_lblStatus, Sketch::kInkSoft);
     m_btnCancel = new QPushButton("Stop", this);
     m_btnCancel->setVisible(false);
     connect(m_btnCancel, &QPushButton::clicked, this, [this]() {
@@ -122,7 +113,7 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
     layout->addWidget(m_progress);
 
     QLabel *lblSuggestion = new QLabel("SUGGESTION (you can edit it)", this);
-    lblSuggestion->setStyleSheet(sectionStyle);
+    Sketch::styleSection(lblSuggestion);
     layout->addWidget(lblSuggestion);
     m_editSuggestion = new QPlainTextEdit(this);
     m_editSuggestion->setPlaceholderText("Suggestions appear here.");
@@ -164,7 +155,7 @@ StoryHelperDialog::StoryHelperDialog(BookCanvasView *canvas,
     connect(m_helper, &StoryHelper::failed, this, [this](const QString &message) {
         setBusy(false);
         m_lblStatus->setText(message);
-        m_lblStatus->setStyleSheet("font-size: 11px; color: #b91c1c;");
+        Sketch::setTextColor(m_lblStatus, Sketch::kTomato.darker(140));
     });
 
     setBusy(false);
@@ -213,6 +204,7 @@ void StoryHelperDialog::setBusy(bool busy, const QString &status) {
     m_btnInsert->setEnabled(!busy);
     m_progress->setVisible(busy);
     m_btnCancel->setVisible(busy);
-    m_lblStatus->setStyleSheet("font-size: 11px; color: #7a5c43;");
+    Sketch::styleHint(m_lblStatus);
+    Sketch::setTextColor(m_lblStatus, Sketch::kInkSoft);
     m_lblStatus->setText(status);
 }

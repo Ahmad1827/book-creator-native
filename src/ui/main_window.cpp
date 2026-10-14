@@ -6,6 +6,7 @@
 #include "app_settings.h"
 #include "settings_dialog.h"
 #include "export_dialog.h"
+#include "sketch.h"
 #include <QApplication>
 #include <QImageReader>
 #include <QUuid>
@@ -318,22 +319,15 @@ void MainWindow::setupUi() {
 }
 
 void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
-    QWidget *topBar = new QWidget(m_editorWidget);
-    topBar->setFixedHeight(56);
-    topBar->setStyleSheet(
-        "QWidget { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #442616, stop:1 #2e180d); border-bottom: 3px solid #1c0e07; }"
-        "QLabel { color: #faebd7; font-weight: 800; font-size: 13px; }"
-        "QComboBox { background: #fbf5ea; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 4px 10px; font-weight: bold; color: #3b2212; }"
-        "QPushButton { background: #fbf5ea; border: 1.5px solid #8d6b4f; border-radius: 6px; padding: 6px 14px; font-weight: bold; color: #3b2212; }"
-        "QPushButton:hover { background: #ffffff; }"
-        "QPushButton:disabled { background: #6b4a33; color: #a88a6c; border-color: #5a351f; }"
-    );
+    auto *topBar = new SketchPanel(m_editorWidget, Sketch::kPaper, SketchPanel::BottomEdge);
+    topBar->setFixedHeight(72);
 
     QHBoxLayout *topLayout = new QHBoxLayout(topBar);
-    topLayout->setContentsMargins(16, 0, 16, 0);
-    topLayout->setSpacing(12);
+    topLayout->setContentsMargins(14, 4, 14, 6);
+    topLayout->setSpacing(8);
 
-    QPushButton *btnShelf = new QPushButton("← Shelf", topBar);
+    QPushButton *btnShelf = new QPushButton("← Bookshelf", topBar);
+    btnShelf->setProperty("role", "ghost");
     connect(btnShelf, &QPushButton::clicked, [this]() {
         if (m_helperDialog) m_helperDialog->close();
         saveProjectsToDisk();
@@ -343,6 +337,8 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
     topLayout->addWidget(btnShelf);
 
     m_lblTitle = new QLabel(topBar);
+    m_lblTitle->setFont(Sketch::titleFont(26));
+    m_lblTitle->setMaximumWidth(380);
     topLayout->addWidget(m_lblTitle);
 
     m_comboThemes = new QComboBox(topBar);
@@ -360,6 +356,7 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
     topLayout->addStretch();
 
     QPushButton *btnPicture = new QPushButton("+ Add Picture", topBar);
+    btnPicture->setProperty("wash", Sketch::kPink);
     btnPicture->setToolTip("Add a scanned painting or photo to the page you last clicked.\nYou can also drag pictures onto the book, or paste with Ctrl+V.");
     connect(btnPicture, &QPushButton::clicked, this, [this]() {
         QStringList patterns;
@@ -377,12 +374,15 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
     topLayout->addWidget(btnPicture);
 
     m_btnHelper = new QPushButton("Story Helper", topBar);
+    m_btnHelper->setProperty("wash", Sketch::kTeal);
     m_btnHelper->setToolTip("Ideas for your words from Claude: rhymes, silly words, what happens next…");
     connect(m_btnHelper, &QPushButton::clicked, this, &MainWindow::openStoryHelper);
     topLayout->addWidget(m_btnHelper);
 
-    m_lblSaveState = new QLabel(topBar);
-    m_lblSaveState->setStyleSheet("color: #dfbe87; font-weight: 700; font-size: 11px; border: none; background: transparent;");
+    m_lblSaveState = Sketch::hint(QString(), topBar);
+    m_lblSaveState->setWordWrap(false);
+    m_lblSaveState->setMinimumWidth(110);
+    m_lblSaveState->setAlignment(Qt::AlignCenter);
     topLayout->addWidget(m_lblSaveState);
 
     m_btnUndo = new QPushButton("↶ Undo", topBar);
@@ -398,14 +398,13 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
     topLayout->addWidget(m_btnRedo);
 
     QPushButton *btnResetZoom = new QPushButton("Fit Book", topBar);
+    btnResetZoom->setProperty("role", "ghost");
     connect(btnResetZoom, &QPushButton::clicked, m_canvasView, &BookCanvasView::fitBookInView);
     topLayout->addWidget(btnResetZoom);
 
-    QPushButton *btnExport = new QPushButton("Print Book (PDF)", topBar);
-    btnExport->setStyleSheet(
-        "background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); "
-        "border: 1.5px solid #8c633f; border-radius: 6px; padding: 6px 16px; font-weight: 800; color: #3b2212;"
-    );
+    QPushButton *btnExport = new QPushButton("Print Book", topBar);
+    btnExport->setProperty("role", "primary");
+    btnExport->setToolTip("Save the whole book as a PDF for printing or sharing");
     connect(btnExport, &QPushButton::clicked, this, &MainWindow::exportPdf);
     topLayout->addWidget(btnExport);
 
@@ -413,22 +412,22 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
 }
 
 void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
-    QWidget *bottomBar = new QWidget(m_editorWidget);
-    bottomBar->setFixedHeight(54);
-    bottomBar->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #381f13, stop:1 #25130a); border-top: 3px solid #1c0e07;");
+    auto *bottomBar = new SketchPanel(m_editorWidget, Sketch::kPaper, SketchPanel::TopEdge);
+    bottomBar->setFixedHeight(66);
 
     QHBoxLayout *botLayout = new QHBoxLayout(bottomBar);
-    botLayout->setContentsMargins(24, 0, 24, 0);
+    botLayout->setContentsMargins(18, 6, 18, 4);
+    botLayout->setSpacing(8);
 
     QHBoxLayout *turnerLayout = new QHBoxLayout();
-    m_btnPrevSpread = new QPushButton("← Prev Spread", bottomBar);
+    turnerLayout->setSpacing(8);
+    m_btnPrevSpread = new QPushButton("← Turn back", bottomBar);
     m_lblPageTracker = new QLabel(bottomBar);
-    m_btnNextSpread = new QPushButton("Next Spread →", bottomBar);
-
-    QString btnStyle = "background: #fbf5ea; border: 1.5px solid #8d6b4f; color: #3b2212; padding: 5px 14px; border-radius: 16px; font-size: 11px; font-weight: 800;";
-    m_btnPrevSpread->setStyleSheet(btnStyle);
-    m_btnNextSpread->setStyleSheet(btnStyle);
-    m_lblPageTracker->setStyleSheet("font-size: 12px; color: #dfbe87; font-weight: 700; margin: 0 10px;");
+    m_lblPageTracker->setFont(Sketch::headingFont(19));
+    m_lblPageTracker->setContentsMargins(8, 0, 8, 0);
+    m_btnNextSpread = new QPushButton("Turn the page →", bottomBar);
+    m_btnPrevSpread->setProperty("role", "chip");
+    m_btnNextSpread->setProperty("role", "chip");
 
     connect(m_btnPrevSpread, &QPushButton::clicked, [this]() {
         switchToSpread(m_currentSpreadIndex - 1);
@@ -448,11 +447,12 @@ void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
     m_chipsContainer = new QWidget(bottomBar);
     m_chipsLayout = new QHBoxLayout(m_chipsContainer);
     m_chipsLayout->setContentsMargins(0, 0, 0, 0);
-    m_chipsLayout->setSpacing(6);
+    m_chipsLayout->setSpacing(4);
     botLayout->addWidget(m_chipsContainer);
 
     QPushButton *btnAddPages = new QPushButton("+ 2 Pages", bottomBar);
-    btnAddPages->setStyleSheet("background: transparent; border: 1.5px dashed #dfbe87; color: #dfbe87; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700;");
+    btnAddPages->setProperty("role", "chip");
+    btnAddPages->setProperty("wash", Sketch::kGreen);
     connect(btnAddPages, &QPushButton::clicked, [this]() {
         m_activeProject.spreads.append(BookSpread::blank(newSpreadId()));
         m_activeProject.renumberPages();
@@ -462,7 +462,7 @@ void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
     botLayout->addWidget(btnAddPages);
 
     QPushButton *btnArrange = new QPushButton("☰ Arrange Pages", bottomBar);
-    btnArrange->setStyleSheet("background: #fbf5ea; border: 1.5px solid #8d6b4f; color: #3b2212; padding: 5px 14px; border-radius: 12px; font-size: 11px; font-weight: 800; margin-left: 6px;");
+    btnArrange->setProperty("wash", Sketch::kLilac);
     connect(btnArrange, &QPushButton::clicked, this, &MainWindow::arrangePages);
     botLayout->addWidget(btnArrange);
 
@@ -589,10 +589,10 @@ void MainWindow::updateNavigationState() {
     int totalPages = m_activeProject.pageCount();
 
     if (spread.isCover()) {
-        m_lblPageTracker->setText("Viewing the Cover (back · front)");
+        m_lblPageTracker->setText("The Cover");
         m_canvasView->setPageNumbers(0, 0);
     } else {
-        m_lblPageTracker->setText(QString("Viewing Pages %1 & %2 of %3")
+        m_lblPageTracker->setText(QString("Pages %1 & %2 of %3")
             .arg(spread.leftPageNum)
             .arg(spread.rightPageNum)
             .arg(totalPages));
@@ -616,11 +616,10 @@ void MainWindow::updateNavigationState() {
         const auto &s = m_activeProject.spreads[i];
         const QString chipText = s.isCover() ? QString("Cover") : QString("pp. %1-%2").arg(s.leftPageNum).arg(s.rightPageNum);
         QPushButton *chip = new QPushButton(chipText, m_chipsContainer);
-        if (i == m_currentSpreadIndex) {
-            chip->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); color: #3b2212; border: 1.5px solid #8c633f; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 11px;");
-        } else {
-            chip->setStyleSheet("background: #3b2012; border: 1.5px solid #5a351f; color: #dfbe87; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700;");
-        }
+        chip->setProperty("role", "chip");
+        chip->setFont(Sketch::headingFont(16));
+        chip->setCheckable(true);
+        chip->setChecked(i == m_currentSpreadIndex);
         connect(chip, &QPushButton::clicked, [this, i]() {
             switchToSpread(i);
         });

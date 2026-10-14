@@ -193,6 +193,8 @@ private:
     bool m_spacePressed = false;
     QPoint m_lastPanPoint;
     bool m_initialFitDone = false;
+    // Keep the whole book in view as panels open and close, until she zooms or pans herself.
+    bool m_autoFit = true;
 
     QPointer<StoryTextItem> m_lastTextItem;
     qreal m_pageHeight = 650.0;

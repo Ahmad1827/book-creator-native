@@ -1,4 +1,5 @@
 #include "page_sorter_dialog.h"
+#include "sketch.h"
 #include "constants.h"
 #include "spread_renderer.h"
 #include <QVBoxLayout>
@@ -28,26 +29,18 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
 
     setWindowTitle("Arrange Pages");
     resize(1080, 720);
-    setStyleSheet(
-        "QDialog { background: #fbf5ea; }"
-        "QLabel { color: #3b2212; }"
-        "QCheckBox { color: #3b2212; font-weight: 700; }"
-        "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 7px 14px; font-weight: 800; color: #3b2212; }"
-        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
-        "QPushButton:disabled { color: #b9a58f; }"
-    );
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 16);
     layout->setSpacing(12);
 
     QLabel *title = new QLabel("Arrange Pages", this);
-    title->setStyleSheet("font-size: 18px; font-weight: 900;");
+    title->setFont(Sketch::titleFont(32));
     layout->addWidget(title);
 
     QLabel *hint = new QLabel("Drag spreads to reorder them, or select one and use the buttons. Double-click a spread to open it. The cover always stays first.", this);
     hint->setWordWrap(true);
-    hint->setStyleSheet("color: #7a5c43;");
+    Sketch::styleHint(hint);
     layout->addWidget(hint);
 
     m_list = new QListWidget(this);
@@ -60,11 +53,6 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
     m_list->setDragDropMode(QAbstractItemView::InternalMove);
     m_list->setDefaultDropAction(Qt::MoveAction);
     m_list->setSelectionMode(QAbstractItemView::SingleSelection);
-    m_list->setStyleSheet(
-        "QListWidget { background: #3b2012; border: 2px solid #1c0e07; border-radius: 10px; padding: 10px; }"
-        "QListWidget::item { border: 3px solid transparent; border-radius: 6px; }"
-        "QListWidget::item:selected { border-color: #dfbe87; background: transparent; }"
-    );
     layout->addWidget(m_list, 1);
 
     connect(m_list->model(), &QAbstractItemModel::rowsMoved, this, [this]() {
@@ -88,7 +76,7 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
     QPushButton *btnDuplicate = new QPushButton("Duplicate", this);
     QPushButton *btnAdd = new QPushButton("+ Add Blank Spread", this);
     QPushButton *btnDelete = new QPushButton("Delete", this);
-    btnDelete->setStyleSheet("QPushButton { background: #fee2e2; border: 1.5px solid #fca5a5; color: #b91c1c; } QPushButton:hover { background: #fecaca; }");
+    btnDelete->setProperty("role", "danger");
     actions->addWidget(btnEarlier);
     actions->addWidget(btnLater);
     actions->addSpacing(12);
@@ -96,7 +84,7 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
     actions->addWidget(btnAdd);
     actions->addWidget(btnDelete);
     actions->addStretch();
-    m_chkPageNumbers = new QCheckBox("Show page numbers", this);
+    m_chkPageNumbers = new QCheckBox("Page numbers", this);
     m_chkPageNumbers->setChecked(m_project.showPageNumbers);
     connect(m_chkPageNumbers, &QCheckBox::toggled, this, [this](bool on) {
         m_project.showPageNumbers = on;
@@ -108,13 +96,12 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
 
     QHBoxLayout *sizeRow = new QHBoxLayout();
     QLabel *lblSize = new QLabel("Book size:", this);
-    lblSize->setStyleSheet("font-weight: 800;");
+    lblSize->setFont(Sketch::headingFont(19));
     QComboBox *comboFormat = new QComboBox(this);
-    comboFormat->setStyleSheet("QComboBox { background: #ffffff; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 5px 8px; color: #3b2212; }");
     for (const auto &format : BOOK_FORMATS) comboFormat->addItem(format.name, format.id);
     comboFormat->setCurrentIndex(qMax(0, comboFormat->findData(m_project.formatId)));
     QLabel *lblSizeNote = new QLabel("Changing size keeps everything where it is, so check the bottom of each page afterwards.", this);
-    lblSizeNote->setStyleSheet("color: #7a5c43; font-size: 11px;");
+    Sketch::styleHint(lblSizeNote);
     connect(comboFormat, &QComboBox::currentIndexChanged, this, [this, comboFormat]() {
         m_project.formatId = comboFormat->currentData().toString();
         rebuildList(m_list->currentItem() ? m_list->currentItem()->data(Qt::UserRole).toString() : QString());
@@ -166,7 +153,7 @@ PageSorterDialog::PageSorterDialog(const BookProject &project, const QString &cu
     QPushButton *btnCancel = new QPushButton("Cancel", this);
     QPushButton *btnDone = new QPushButton("Done", this);
     btnDone->setDefault(true);
-    btnDone->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); border: 1.5px solid #8c633f; padding: 8px 22px; }");
+    btnDone->setProperty("role", "primary");
     connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
     connect(btnDone, &QPushButton::clicked, this, [this]() {
         if (QListWidgetItem *current = m_list->currentItem()) m_focusSpreadId = current->data(Qt::UserRole).toString();
@@ -193,11 +180,8 @@ QPixmap PageSorterDialog::thumbnailFor(const BookSpread &spread) {
     pix.fill(Qt::transparent);
     QPainter painter(&pix);
     painter.drawPixmap(0, 0, art);
-    QFont font = painter.font();
-    font.setBold(true);
-    font.setPixelSize(13);
-    painter.setFont(font);
-    painter.setPen(QColor("#dfbe87"));
+    painter.setFont(Sketch::headingFont(17));
+    painter.setPen(Sketch::kInk);
     const QString caption = spread.isCover()
         ? QString("Back Cover  ·  Front Cover")
         : QString("Pages %1 – %2").arg(spread.leftPageNum).arg(spread.rightPageNum);

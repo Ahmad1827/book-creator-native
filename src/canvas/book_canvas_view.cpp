@@ -13,6 +13,7 @@
 #include <QFileInfo>
 #include <QtMath>
 #include "asset_store.h"
+#include "sketch.h"
 #include <QRandomGenerator>
 
 namespace {
@@ -92,13 +93,14 @@ BookCanvasView::BookCanvasView(QWidget *parent)
 
 void BookCanvasView::resizeEvent(QResizeEvent *event) {
     QGraphicsView::resizeEvent(event);
-    if (!m_initialFitDone && width() > 100 && height() > 100) {
+    if ((m_autoFit || !m_initialFitDone) && width() > 100 && height() > 100) {
         fitBookInView();
         m_initialFitDone = true;
     }
 }
 
 void BookCanvasView::fitBookInView() {
+    m_autoFit = true;
     fitInView(QRectF(-60, -40, 1320, m_pageHeight + 80), Qt::KeepAspectRatio);
 }
 
@@ -722,18 +724,20 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 
     painter->save();
 
+    // A warm paper desk scattered with faint pencil doodles.
     QRectF deskRect = m_scene->sceneRect();
-    QLinearGradient deskGrad(0, -10000, 0, 10650);
-    deskGrad.setColorAt(0.0, QColor("#442617"));
-    deskGrad.setColorAt(0.5, QColor("#351c0f"));
-    deskGrad.setColorAt(1.0, QColor("#29150b"));
-    painter->fillRect(deskRect, deskGrad);
+    painter->fillRect(deskRect, Sketch::kDesk);
+    painter->fillRect(deskRect, QBrush(Sketch::doodleTile()));
 
     const qreal h = m_pageHeight;
     QRectF casingRect(-18, -14, 1236, h + 28);
-    painter->setBrush(m_theme.spineColor);
-    painter->setPen(QPen(QColor(0, 0, 0, 140), 2));
-    painter->drawRoundedRect(casingRect, 10, 10);
+    const QPainterPath casing = Sketch::wobblyRoundedRect(casingRect, 12, Sketch::seedFor(casingRect.size(), 3), 1.6);
+    QColor shadow = Sketch::kInk;
+    shadow.setAlpha(45);
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->fillPath(casing.translated(9, 11), shadow);
+    painter->fillPath(casing, m_theme.spineColor);
+    Sketch::drawInk(painter, casing, Sketch::kInk, 2.6);
 
     QRectF leftPage(0, 0, 600, h);
     QRectF rightPage(600, 0, 600, h);
@@ -771,6 +775,10 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
 
     ThemeDecors::draw(painter, m_theme, h);
     ThemeDecors::drawPageNumbers(painter, m_theme, m_leftPageNum, m_rightPageNum, h);
+
+    QColor pageInk = Sketch::kInk;
+    pageInk.setAlpha(170);
+    Sketch::drawInk(painter, Sketch::wobblyRoundedRect(QRectF(0, 0, 1200, h), 2, Sketch::seedFor(QSizeF(1200, h), 4), 1.0), pageInk, 1.6);
 
     painter->restore();
 }
@@ -999,6 +1007,7 @@ void BookCanvasView::wheelEvent(QWheelEvent *event) {
     if (event->angleDelta().y() == 0) return;
 
     const qreal factor = (event->angleDelta().y() > 0) ? 1.12 : (1.0 / 1.12);
+    m_autoFit = false;
 
     QPointF mouseViewportPos = event->position();
     QPointF anchorScenePos = mapToScene(mouseViewportPos.toPoint());
@@ -1165,6 +1174,7 @@ void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
     }
 
     if (m_isMiddlePanning || m_isSpacePanning) {
+        m_autoFit = false;
         QPoint delta = event->pos() - m_lastPanPoint;
         m_lastPanPoint = event->pos();
 
@@ -1258,12 +1268,6 @@ void BookCanvasView::mouseDoubleClickEvent(QMouseEvent *event) {
 
 void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *item) {
     QMenu menu(this);
-    menu.setStyleSheet(
-        "QMenu { background-color: #fbf5ea; border: 2px solid #8d6b4f; border-radius: 8px; padding: 4px; }"
-        "QMenu::item { color: #3b2212; padding: 6px 20px; font-weight: bold; border-radius: 4px; }"
-        "QMenu::item:selected { background-color: #ecd9bf; color: #1a0d06; }"
-        "QMenu::separator { height: 1px; background-color: #dcc6ab; margin: 4px 6px; }"
-    );
 
     if (item && !item->data(ItemRole::IsTemplate).toBool()) {
         m_scene->clearSelection();

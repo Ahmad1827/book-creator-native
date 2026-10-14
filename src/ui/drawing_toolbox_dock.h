@@ -46,7 +46,7 @@ private:
     void buildIconRail();
     void buildDrawerPages();
     void animateDrawer(bool open);
-    QIcon createSvgIcon(const QString &pathD, const QString &fillColor = "#5c351f");
+    QIcon createSvgIcon(const QString &pathD, const QString &fillColor = "#1f1a17");
 
     QWidget *createPencilPage();
     QWidget *createBrushPage();
@@ -57,7 +57,7 @@ private:
     QWidget *createTextPage();
 
     QWidget *m_iconRail;
-    QFrame *m_drawer;
+    QWidget *m_drawer;
     QStackedWidget *m_stackedDrawer;
     QLabel *m_drawerTitle;
 

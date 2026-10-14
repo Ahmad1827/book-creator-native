@@ -1,4 +1,5 @@
 #include "export_dialog.h"
+#include "sketch.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
@@ -8,22 +9,14 @@ ExportDialog::ExportDialog(const BookProject &project, QWidget *parent)
     : QDialog(parent),
       m_project(project) {
     setWindowTitle("Print Book (PDF)");
-    setMinimumWidth(560);
-    setStyleSheet(
-        "QDialog { background: #fbf5ea; }"
-        "QLabel, QRadioButton, QCheckBox { color: #3b2212; }"
-        "QGroupBox { color: #3b2212; font-weight: 800; border: 1.5px solid #dcc6ab; border-radius: 8px; margin-top: 14px; padding: 14px 12px 10px 12px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
-        "QPushButton { background: #fdfaf5; border: 1.5px solid #dcc6ab; border-radius: 6px; padding: 6px 14px; font-weight: 800; color: #3b2212; }"
-        "QPushButton:hover { background: #ffffff; border-color: #8b5b32; }"
-    );
+    setMinimumWidth(660);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 16, 18, 16);
     layout->setSpacing(10);
 
     QLabel *title = new QLabel("Print Book (PDF)", this);
-    title->setStyleSheet("font-size: 18px; font-weight: 900;");
+    title->setFont(Sketch::titleFont(32));
     layout->addWidget(title);
 
     QLabel *size = new QLabel(QString("Book size: <b>%1</b> &nbsp;·&nbsp; %2 pages plus covers")
@@ -32,8 +25,8 @@ ExportDialog::ExportDialog(const BookProject &project, QWidget *parent)
 
     QGroupBox *layoutBox = new QGroupBox("Layout", this);
     QVBoxLayout *layoutBoxLayout = new QVBoxLayout(layoutBox);
-    m_radioSingle = new QRadioButton("Single pages: for printing and binding (front cover first, back cover last)", layoutBox);
-    m_radioSpreads = new QRadioButton("Two-page spreads: facing pages side by side, as on screen", layoutBox);
+    m_radioSingle = new QRadioButton("Single pages, for printing (front cover first, back cover last)", layoutBox);
+    m_radioSpreads = new QRadioButton("Two-page spreads, side by side as on screen", layoutBox);
     m_radioSingle->setChecked(true);
     layoutBoxLayout->addWidget(m_radioSingle);
     layoutBoxLayout->addWidget(m_radioSpreads);
@@ -46,13 +39,13 @@ ExportDialog::ExportDialog(const BookProject &project, QWidget *parent)
         "Print shops trim a sliver off each page. Bleed extends the paper colour and any full-page "
         "pictures past the edge so nothing white shows after trimming. Leave it off for home printing.", printBox);
     bleedNote->setWordWrap(true);
-    bleedNote->setStyleSheet("color: #7a5c43; font-size: 11px;");
+    Sketch::styleHint(bleedNote);
     printLayout->addWidget(m_chkBleed);
     printLayout->addWidget(bleedNote);
     layout->addWidget(printBox);
 
     m_lblSummary = new QLabel(this);
-    m_lblSummary->setStyleSheet("font-weight: 700;");
+    m_lblSummary->setFont(Sketch::headingFont(19));
     layout->addWidget(m_lblSummary);
 
     const QStringList lowRes = PdfExporter::lowResolutionPictures(project);
@@ -63,8 +56,12 @@ ExportDialog::ExportDialog(const BookProject &project, QWidget *parent)
             "<b>Some pictures may print blurry</b> (under 150 dpi). Shrinking them on the page, or scanning at a "
             "higher resolution, will help:<br>• " + shown.join("<br>• "), this);
         warning->setWordWrap(true);
-        warning->setStyleSheet("background: #fff4e5; border: 1px solid #f0c27b; border-radius: 6px; padding: 8px; color: #7a4a12;");
-        layout->addWidget(warning);
+        // A pinned-on note so the warning stands out on the page.
+        auto *note = new SketchPanel(this, QColor("#ffe8c2"), SketchPanel::TopEdge | SketchPanel::BottomEdge | SketchPanel::LeftEdge | SketchPanel::RightEdge);
+        QVBoxLayout *noteLayout = new QVBoxLayout(note);
+        noteLayout->setContentsMargins(14, 10, 14, 12);
+        noteLayout->addWidget(warning);
+        layout->addWidget(note);
     }
 
     layout->addStretch();
@@ -73,7 +70,7 @@ ExportDialog::ExportDialog(const BookProject &project, QWidget *parent)
     QPushButton *btnCancel = new QPushButton("Cancel", this);
     QPushButton *btnExport = new QPushButton("Save PDF…", this);
     btnExport->setDefault(true);
-    btnExport->setStyleSheet("QPushButton { background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); border: 1.5px solid #8c633f; padding: 7px 22px; }");
+    btnExport->setProperty("role", "primary");
     connect(btnCancel, &QPushButton::clicked, this, &QDialog::reject);
     connect(btnExport, &QPushButton::clicked, this, &QDialog::accept);
     footer->addWidget(btnCancel);
