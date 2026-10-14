@@ -67,3 +67,15 @@ target_link_libraries(book-creator-native PRIVATE
     Qt6::Widgets
     Qt6::Svg
 )
+if(WIN32)
+    # A normal windowed app (no console), named for the people using it.
+    set_target_properties(book-creator-native PROPERTIES
+        WIN32_EXECUTABLE ON
+        OUTPUT_NAME "StorybookStudio"
+    )
+endif()
+
+if(MSVC)
+    # Sources contain non-ASCII text such as "…".
+    target_compile_options(book-creator-native PRIVATE /utf-8)
+endif()

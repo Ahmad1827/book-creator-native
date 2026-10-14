@@ -1,0 +1,59 @@
+name: Windows build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $out = "StorybookStudio"
+          New-Item -ItemType Directory -Path $out | Out-Null
+          Copy-Item build/StorybookStudio.exe $out/
+          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw $out/StorybookStudio.exe
+          $crt = Get-ChildItem "$env:VCToolsRedistDir\x64" -Directory -Filter "Microsoft.VC*.CRT" | Select-Object -First 1
+          Copy-Item "$($crt.FullName)\*.dll" $out/
+          Compress-Archive -Path $out -DestinationPath StorybookStudio-windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StorybookStudio-windows
+          path: StorybookStudio-windows.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: StorybookStudio-windows.zip
+          body: |
+            Storybook Studio for Windows.
+
+            Unzip the folder anywhere and double-click `StorybookStudio.exe`. Keep all the files together.
+            Windows may show a "Windows protected your PC" screen because the app isn't signed: click **More info**, then **Run anyway**.
+
+            The Story Helper needs Claude Code installed and signed in on the same PC.
