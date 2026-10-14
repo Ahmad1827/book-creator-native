@@ -39,6 +39,12 @@ add_executable(book-creator-native
     src/ui/main_window.cpp
     src/utils/pdf_exporter.h
     src/utils/pdf_exporter.cpp
+    src/utils/spread_renderer.h
+    src/utils/spread_renderer.cpp
+    src/utils/asset_store.h
+    src/utils/asset_store.cpp
+    src/ui/page_sorter_dialog.h
+    src/ui/page_sorter_dialog.cpp
     assets/resources.qrc
 )
 

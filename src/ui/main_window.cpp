@@ -1,6 +1,10 @@
 #include "main_window.h"
 #include "new_book_dialog.h"
 #include "pdf_exporter.h"
+#include "page_sorter_dialog.h"
+#include "asset_store.h"
+#include <QImageReader>
+#include <QUuid>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QStandardPaths>
@@ -10,6 +14,54 @@
 #include <QCloseEvent>
 #include <QAction>
 #include <QSignalBlocker>
+
+namespace {
+
+QString newSpreadId() {
+    return "s-" + QUuid::createUuid().toString(QUuid::WithoutBraces).left(8);
+}
+
+QJsonObject coverText(const QString &text, const BookTheme &theme, int pixelSize, qreal y, int z) {
+    QJsonObject obj;
+    obj["type"] = "text";
+    obj["id"] = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    obj["text"] = text;
+    obj["font"] = theme.recommendedFont;
+    obj["size"] = pixelSize;
+    obj["color"] = theme.inkColor.name(QColor::HexArgb);
+    obj["align"] = "center";
+    obj["width"] = 480;
+    obj["x"] = 660;
+    obj["y"] = y;
+    obj["z"] = z;
+    return obj;
+}
+
+// Back cover on the left, front cover on the right, like a real book's jacket laid flat.
+BookSpread makeCoverSpread(const BookProject &project) {
+    const BookTheme &theme = getThemeById(project.themeId);
+    BookSpread cover = BookSpread::blank("cover");
+    cover.kind = "cover";
+    QJsonArray items;
+    items.append(coverText(project.title, theme, 56, 110, 1));
+    items.append(coverText(QString("by %1").arg(project.author), theme, 26, 500, 2));
+    cover.canvasData["version"] = 1;
+    cover.canvasData["items"] = items;
+    return cover;
+}
+
+QStringList assetIdsIn(const BookProject &project) {
+    QStringList ids;
+    for (const auto &spread : project.spreads) {
+        for (const auto &val : spread.canvasData["items"].toArray()) {
+            const QString asset = val.toObject()["asset"].toString();
+            if (!asset.isEmpty() && !ids.contains(asset)) ids.append(asset);
+        }
+    }
+    return ids;
+}
+
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent),
@@ -91,6 +143,10 @@ MainWindow::MainWindow(QWidget *parent)
         QFile file(path);
         if (file.open(QIODevice::ReadOnly)) {
             QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+            const QJsonObject assets = doc.object()["assets"].toObject();
+            for (auto it = assets.constBegin(); it != assets.constEnd(); ++it) {
+                AssetStore::addEncoded(QByteArray::fromBase64(it.value().toString().toLatin1()), QFileInfo(it.key()).suffix());
+            }
             BookProject loaded = BookProject::fromJson(doc.object());
             m_projects.prepend(loaded);
             saveProjectsToDisk();
@@ -127,10 +183,19 @@ MainWindow::MainWindow(QWidget *parent)
         QString path = QFileDialog::getSaveFileName(this, "Export Project JSON", QString("%1.lofibook.json").arg(safeTitle), "JSON Files (*.json)");
         if (path.isEmpty()) return;
 
-        QFile file(path);
+        // Pictures are packed into the file so the book can move to another computer.
+        QJsonObject obj = proj.toJson();
+        QJsonObject assets;
+        for (const QString &id : assetIdsIn(proj)) {
+            const QByteArray bytes = AssetStore::bytes(id);
+            if (!bytes.isEmpty()) assets[id] = QString::fromLatin1(bytes.toBase64());
+        }
+        if (!assets.isEmpty()) obj["assets"] = assets;
+
+        QSaveFile file(path);
         if (file.open(QIODevice::WriteOnly)) {
-            QJsonDocument doc(proj.toJson());
-            file.write(doc.toJson(QJsonDocument::Indented));
+            file.write(QJsonDocument(obj).toJson(QJsonDocument::Compact));
+            if (!file.commit()) QMessageBox::critical(this, "Save Failed", "Could not write the book file.");
         }
     });
 
@@ -285,6 +350,23 @@ void MainWindow::setupEditorTopBar(QVBoxLayout *layout) {
 
     topLayout->addStretch();
 
+    QPushButton *btnPicture = new QPushButton("+ Add Picture", topBar);
+    btnPicture->setToolTip("Add a scanned painting or photo to the page you last clicked.\nYou can also drag pictures onto the book, or paste with Ctrl+V.");
+    connect(btnPicture, &QPushButton::clicked, this, [this]() {
+        QStringList patterns;
+        for (const QByteArray &fmt : QImageReader::supportedImageFormats()) patterns << "*." + QString::fromLatin1(fmt);
+        const QStringList paths = QFileDialog::getOpenFileNames(this, "Add Pictures", QString(),
+            QString("Pictures (%1)").arg(patterns.join(' ')));
+        for (const QString &path : paths) {
+            QString error;
+            if (!m_canvasView->importImageFile(path, &error)) {
+                QMessageBox::warning(this, "Add Picture", QString("Couldn't open %1.\n%2").arg(QFileInfo(path).fileName(), error));
+            }
+        }
+        m_canvasView->setFocus();
+    });
+    topLayout->addWidget(btnPicture);
+
     m_lblSaveState = new QLabel(topBar);
     m_lblSaveState->setStyleSheet("color: #dfbe87; font-weight: 700; font-size: 11px; border: none; background: transparent;");
     topLayout->addWidget(m_lblSaveState);
@@ -358,39 +440,31 @@ void MainWindow::setupEditorBottomBar(QVBoxLayout *layout) {
     QPushButton *btnAddPages = new QPushButton("+ 2 Pages", bottomBar);
     btnAddPages->setStyleSheet("background: transparent; border: 1.5px dashed #dfbe87; color: #dfbe87; padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 700;");
     connect(btnAddPages, &QPushButton::clicked, [this]() {
-        const auto &last = m_activeProject.spreads.last();
-        BookSpread ns;
-        ns.id = QString("s-%1").arg(m_activeProject.spreads.size() + 1);
-        ns.leftPageNum = last.rightPageNum + 1;
-        ns.rightPageNum = last.rightPageNum + 2;
-        ns.activeLayerId = "layer-1";
-        CanvasLayer dl;
-        dl.id = "layer-1";
-        dl.name = "Artwork Layer";
-        ns.layers.append(dl);
-
-        m_activeProject.spreads.append(ns);
+        m_activeProject.spreads.append(BookSpread::blank(newSpreadId()));
+        m_activeProject.renumberPages();
         switchToSpread(m_activeProject.spreads.size() - 1);
         saveProjectsToDisk();
     });
     botLayout->addWidget(btnAddPages);
+
+    QPushButton *btnArrange = new QPushButton("☰ Arrange Pages", bottomBar);
+    btnArrange->setStyleSheet("background: #fbf5ea; border: 1.5px solid #8d6b4f; color: #3b2212; padding: 5px 14px; border-radius: 12px; font-size: 11px; font-weight: 800; margin-left: 6px;");
+    connect(btnArrange, &QPushButton::clicked, this, &MainWindow::arrangePages);
+    botLayout->addWidget(btnArrange);
 
     layout->addWidget(bottomBar);
 }
 
 void MainWindow::openProject(const BookProject &proj) {
     m_activeProject = proj;
-    if (m_activeProject.spreads.isEmpty()) {
-        BookSpread first;
-        first.id = "s-1";
-        first.activeLayerId = "layer-1";
-        CanvasLayer layer;
-        layer.id = "layer-1";
-        layer.name = "Artwork Layer";
-        first.layers.append(layer);
-        m_activeProject.spreads.append(first);
+    if (m_activeProject.pageCount() == 0) {
+        m_activeProject.spreads.append(BookSpread::blank(newSpreadId()));
     }
-    m_currentSpreadIndex = 0;
+    if (!m_activeProject.hasCover()) {
+        m_activeProject.spreads.prepend(makeCoverSpread(m_activeProject));
+    }
+    m_activeProject.renumberPages();
+    m_currentSpreadIndex = 1;
     m_lblTitle->setText(m_activeProject.title);
 
     {
@@ -401,7 +475,7 @@ void MainWindow::openProject(const BookProject &proj) {
     m_canvasView->setTheme(getThemeById(m_activeProject.themeId));
 
     m_canvasView->clearUndoHistory();
-    const auto &firstSpread = m_activeProject.spreads[0];
+    const auto &firstSpread = m_activeProject.spreads[m_currentSpreadIndex];
     m_canvasView->loadSpread(firstSpread.id, firstSpread.canvasData);
     m_lblSaveState->setText("All changes saved");
 
@@ -429,6 +503,28 @@ void MainWindow::switchToSpread(int index) {
     updateNavigationState();
 }
 
+void MainWindow::arrangePages() {
+    commitCanvas();
+    const QString currentId = m_activeProject.spreads[m_currentSpreadIndex].id;
+    PageSorterDialog dlg(m_activeProject, currentId, this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    m_activeProject.spreads = dlg.spreads();
+    m_activeProject.showPageNumbers = dlg.showPageNumbers();
+    m_activeProject.renumberPages();
+
+    int index = 0;
+    for (int i = 0; i < m_activeProject.spreads.size(); ++i) {
+        if (m_activeProject.spreads[i].id == dlg.focusSpreadId()) index = i;
+    }
+    // The spreads were already committed, so load directly instead of committing over them.
+    m_currentSpreadIndex = index;
+    const auto &spread = m_activeProject.spreads[index];
+    m_canvasView->loadSpread(spread.id, spread.canvasData);
+    updateNavigationState();
+    saveProjectsToDisk();
+}
+
 void MainWindow::scheduleAutosave() {
     m_lblSaveState->setText("Unsaved changes…");
     m_autosaveTimer->start();
@@ -441,12 +537,19 @@ void MainWindow::closeEvent(QCloseEvent *event) {
 
 void MainWindow::updateNavigationState() {
     const auto &spread = m_activeProject.spreads[m_currentSpreadIndex];
-    int totalPages = m_activeProject.spreads.size() * 2;
+    int totalPages = m_activeProject.pageCount();
 
-    m_lblPageTracker->setText(QString("Viewing Pages %1 & %2 of %3")
-        .arg(spread.leftPageNum)
-        .arg(spread.rightPageNum)
-        .arg(totalPages));
+    if (spread.isCover()) {
+        m_lblPageTracker->setText("Viewing the Cover (back · front)");
+        m_canvasView->setPageNumbers(0, 0);
+    } else {
+        m_lblPageTracker->setText(QString("Viewing Pages %1 & %2 of %3")
+            .arg(spread.leftPageNum)
+            .arg(spread.rightPageNum)
+            .arg(totalPages));
+        const bool numbers = m_activeProject.showPageNumbers;
+        m_canvasView->setPageNumbers(numbers ? spread.leftPageNum : 0, numbers ? spread.rightPageNum : 0);
+    }
 
     m_btnPrevSpread->setEnabled(m_currentSpreadIndex > 0);
     m_btnNextSpread->setEnabled(m_currentSpreadIndex < m_activeProject.spreads.size() - 1);
@@ -462,7 +565,8 @@ void MainWindow::updateNavigationState() {
 
     for (int i = 0; i < m_activeProject.spreads.size(); ++i) {
         const auto &s = m_activeProject.spreads[i];
-        QPushButton *chip = new QPushButton(QString("pp. %1-%2").arg(s.leftPageNum).arg(s.rightPageNum), m_chipsContainer);
+        const QString chipText = s.isCover() ? QString("Cover") : QString("pp. %1-%2").arg(s.leftPageNum).arg(s.rightPageNum);
+        QPushButton *chip = new QPushButton(chipText, m_chipsContainer);
         if (i == m_currentSpreadIndex) {
             chip->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #f3dfba, stop:1 #dfbe87); color: #3b2212; border: 1.5px solid #8c633f; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 11px;");
         } else {
@@ -585,7 +689,7 @@ void MainWindow::exportPdf() {
     bool success = PdfExporter::exportProjectToPdf(m_activeProject, theme, layout, filePath);
 
     if (success) {
-        QMessageBox::information(this, "Export Succeeded", QString("Your book was saved as a PDF with all %1 pages.").arg(m_activeProject.spreads.size() * 2));
+        QMessageBox::information(this, "Export Succeeded", QString("Your book was saved as a PDF with all %1 pages%2.").arg(m_activeProject.pageCount()).arg(m_activeProject.hasCover() ? " plus the covers" : ""));
     } else {
         QMessageBox::critical(this, "Export Failed", "Could not generate PDF export.");
     }

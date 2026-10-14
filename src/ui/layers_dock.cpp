@@ -155,6 +155,10 @@ QWidget *LayersDock::createTemplatesTab() {
 
     struct TemplateEntry { QString title; QString desc; QString id; };
     QList<TemplateEntry> presets = {
+        {"Big Picture & Caption", "Large illustration with a line of story text underneath", "big_art_caption"},
+        {"Full-Page Picture", "One illustration filling the whole page", "full_page_art"},
+        {"Story Text Page", "A page just for words, facing a picture", "text_page"},
+        {"Picture Across Both Pages", "One big scene spanning the whole spread", "spread_art"},
         {"Top Scene / Bottom Text", "Illustration on top, text card below", "top_art_bottom_text"},
         {"Top Text / Bottom Scene", "Text card on top, illustration below", "bottom_art_top_text"},
         {"Framed Story Page", "Inner border frame with dashed margin", "classic_arch_story"},
@@ -254,8 +258,8 @@ void LayersDock::setLayers(const QList<CanvasLayer> &layers, const QString &acti
 }
 
 void LayersDock::setPageNumbers(int leftNum, int rightNum) {
-    m_btnSideLeft->setText(QString("Page %1 (Left)").arg(leftNum));
-    m_btnSideRight->setText(QString("Page %2 (Right)").arg(rightNum));
+    m_btnSideLeft->setText(leftNum > 0 ? QString("Page %1 (Left)").arg(leftNum) : QString("Back Cover"));
+    m_btnSideRight->setText(rightNum > 0 ? QString("Page %1 (Right)").arg(rightNum) : QString("Front Cover"));
 }
 
 QString LayersDock::activeSide() const {

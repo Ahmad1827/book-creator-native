@@ -34,6 +34,7 @@ private:
     void commitCanvas();
     bool isEditorOpen() const;
     void scheduleAutosave();
+    void arrangePages();
     void loadProjectsFromDisk();
     void saveProjectsToDisk();
     void exportPdf();

@@ -7,6 +7,12 @@
 #include <QSvgRenderer>
 #include <QUndoCommand>
 #include <QTimer>
+#include <QMimeData>
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QFileInfo>
+#include <QtMath>
+#include "asset_store.h"
 
 namespace {
 
@@ -64,6 +70,13 @@ BookCanvasView::BookCanvasView(QWidget *parent)
     setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     setFrameShape(QFrame::NoFrame);
     setFocusPolicy(Qt::StrongFocus);
+    setAcceptDrops(true);
+
+    // Resize/rotate handles sit outside item bounds, so repaint them in full.
+    connect(m_scene, &QGraphicsScene::selectionChanged, viewport(), qOverload<>(&QWidget::update));
+    connect(m_scene, &QGraphicsScene::changed, this, [this]() {
+        if (handleTarget()) viewport()->update();
+    });
 
     setMode(CanvasMode::Draw);
 }
@@ -109,6 +122,7 @@ void BookCanvasView::setMode(CanvasMode mode) {
         if (!item->parentItem()) applyInteractionFlags(item);
     }
     updateCursor();
+    viewport()->update();
 }
 
 void BookCanvasView::updateCursor() {
@@ -146,6 +160,10 @@ void BookCanvasView::applyInteractionFlags(QGraphicsItem *item) {
 
 void BookCanvasView::adoptItem(QGraphicsItem *item) {
     CanvasSerializer::ensureId(item);
+    if (item->type() == ImageItem::Type) {
+        // Big scans are expensive to rescale on every repaint.
+        item->setCacheMode(QGraphicsItem::DeviceCoordinateCache);
+    }
     if (auto *text = dynamic_cast<StoryTextItem*>(item)) {
         connect(text, &StoryTextItem::editingFinished, this, &BookCanvasView::onTextEditingFinished);
     }
@@ -159,6 +177,17 @@ qreal BookCanvasView::nextTopZ() const {
         maxZ = qMax(maxZ, item->zValue());
     }
     return maxZ + 1;
+}
+
+void BookCanvasView::centerTransformOrigin(QGraphicsItem *item) {
+    item->setTransformOriginPoint(item->boundingRect().center());
+}
+
+void BookCanvasView::setPageNumbers(int leftNum, int rightNum) {
+    m_leftPageNum = leftNum;
+    m_rightPageNum = rightNum;
+    resetCachedContent();
+    viewport()->update();
 }
 
 void BookCanvasView::setBrushSubtype(const QString &subtype) {
@@ -391,6 +420,7 @@ void BookCanvasView::endStroke() {
 
     if (m_currentStroke) {
         m_currentStroke->addSample(m_lastRawPos, m_smoothedPressure);
+        centerTransformOrigin(m_currentStroke);
         applyInteractionFlags(m_currentStroke);
         m_currentStroke = nullptr;
     }
@@ -410,7 +440,8 @@ void BookCanvasView::eraseAtPoint(const QPointF &scenePos) {
 
         if (auto *stroke = dynamic_cast<InkStrokeItem*>(item)) {
             QList<QVector<StrokeSample>> runs;
-            if (!stroke->eraseCircle(stroke->mapFromScene(scenePos), r, runs)) continue;
+            const qreal localRadius = r / qMax(0.01, stroke->scale());
+            if (!stroke->eraseCircle(stroke->mapFromScene(scenePos), localRadius, runs)) continue;
 
             if (runs.isEmpty()) {
                 m_scene->removeItem(stroke);
@@ -424,6 +455,9 @@ void BookCanvasView::eraseAtPoint(const QPointF &scenePos) {
                 piece->setSamples(runs[i]);
                 piece->setPos(stroke->pos());
                 piece->setTransform(stroke->transform());
+                piece->setTransformOriginPoint(stroke->transformOriginPoint());
+                piece->setScale(stroke->scale());
+                piece->setRotation(stroke->rotation());
                 piece->setZValue(stroke->zValue());
                 m_scene->addItem(piece);
                 adoptItem(piece);
@@ -522,9 +556,23 @@ void BookCanvasView::handleTextClick(const QPointF &scenePos, QMouseEvent *event
 
     auto *text = new StoryTextItem();
     text->setStyle(m_textFamily, m_textPixelSize, m_textColor, m_textAlign);
-    const qreal pageRight = scenePos.x() < 600 ? 570.0 : 1170.0;
-    text->setTextWidth(qBound(140.0, pageRight - scenePos.x(), 440.0));
-    text->setPos(scenePos - QPointF(8, m_textPixelSize * 0.7));
+
+    // Clicking inside a layout's text card makes the box span the card.
+    QRectF card;
+    for (auto *item : m_scene->items(scenePos)) {
+        if (item->data(ItemRole::IsTemplate).toBool() && item->data(ItemRole::TemplateKind).toString() == "text") {
+            card = item->sceneBoundingRect();
+            break;
+        }
+    }
+    if (card.isValid()) {
+        text->setTextWidth(card.width() - 24);
+        text->setPos(card.left() + 12, scenePos.y() - m_textPixelSize * 0.7);
+    } else {
+        const qreal pageRight = scenePos.x() < 600 ? 570.0 : 1170.0;
+        text->setTextWidth(qBound(140.0, pageRight - scenePos.x(), 440.0));
+        text->setPos(scenePos - QPointF(8, m_textPixelSize * 0.7));
+    }
     text->setZValue(nextTopZ());
     m_scene->addItem(text);
     adoptItem(text);
@@ -618,8 +666,226 @@ void BookCanvasView::drawBackground(QPainter *painter, const QRectF &rect) {
     painter->drawRect(rightPage.adjusted(12, 12, -12, -12));
 
     ThemeDecors::draw(painter, m_theme);
+    ThemeDecors::drawPageNumbers(painter, m_theme, m_leftPageNum, m_rightPageNum);
 
     painter->restore();
+}
+
+void BookCanvasView::drawForeground(QPainter *painter, const QRectF &rect) {
+    Q_UNUSED(rect);
+    QGraphicsItem *item = handleTarget();
+    if (!item) return;
+
+    const HandleGeometry g = handleGeometry(item);
+    const qreal px = 1.0 / transform().m11();
+    const QColor accent("#8b5b32");
+
+    painter->save();
+    QPen outlinePen(accent, 1.5, Qt::DashLine);
+    outlinePen.setCosmetic(true);
+    painter->setPen(outlinePen);
+    painter->setBrush(Qt::NoBrush);
+    painter->drawPolygon(g.outline);
+
+    QPen solid(accent, 2);
+    solid.setCosmetic(true);
+    painter->setPen(solid);
+    painter->drawLine(g.rotateBase, g.rotate);
+
+    painter->setBrush(QColor("#fbf5ea"));
+    painter->drawEllipse(g.resize, 7 * px, 7 * px);
+    painter->setBrush(QColor("#dfbe87"));
+    painter->drawEllipse(g.rotate, 7 * px, 7 * px);
+    painter->restore();
+}
+
+// ---------------------------------------------------------------------------
+// Resize & rotate handles
+
+QGraphicsItem *BookCanvasView::handleTarget() const {
+    if (m_mode != CanvasMode::Select) return nullptr;
+    const auto selected = m_scene->selectedItems();
+    if (selected.size() != 1) return nullptr;
+    QGraphicsItem *item = selected.first();
+    if (item->data(ItemRole::Locked).toBool() || item->data(ItemRole::IsTemplate).toBool()) return nullptr;
+    if (auto *text = dynamic_cast<StoryTextItem*>(item); text && text->isEditing()) return nullptr;
+    return item;
+}
+
+BookCanvasView::HandleGeometry BookCanvasView::handleGeometry(QGraphicsItem *item) const {
+    HandleGeometry g;
+    const QRectF br = item->boundingRect();
+    g.outline = item->mapToScene(br);
+    g.center = item->mapToScene(br.center());
+    g.resize = item->mapToScene(br.bottomRight());
+    g.rotateBase = item->mapToScene(QPointF(br.center().x(), br.top()));
+
+    QPointF up = g.rotateBase - g.center;
+    const qreal len = qSqrt(up.x() * up.x() + up.y() * up.y());
+    up = len > 1e-6 ? up / len : QPointF(0, -1);
+    g.rotate = g.rotateBase + up * (30.0 / transform().m11());
+    return g;
+}
+
+BookCanvasView::HandleDrag BookCanvasView::handleAt(const QPointF &viewportPos) const {
+    QGraphicsItem *item = handleTarget();
+    if (!item) return HandleDrag::None;
+    const HandleGeometry g = handleGeometry(item);
+    auto near = [&](const QPointF &scenePoint) {
+        return QLineF(viewportTransform().map(scenePoint), viewportPos).length() <= 11.0;
+    };
+    if (near(g.resize)) return HandleDrag::Resize;
+    if (near(g.rotate)) return HandleDrag::Rotate;
+    return HandleDrag::None;
+}
+
+void BookCanvasView::beginHandleDrag(HandleDrag drag, const QPointF &scenePos) {
+    QGraphicsItem *item = handleTarget();
+    if (!item) return;
+
+    // Items that were never transformed can safely pivot around their centre.
+    if (qFuzzyCompare(item->scale(), 1.0) && qFuzzyIsNull(item->rotation())) {
+        centerTransformOrigin(item);
+    }
+
+    m_handleDrag = drag;
+    m_handleItem = item;
+    m_dragCenter = item->mapToScene(item->transformOriginPoint());
+    const QPointF fromCenter = scenePos - m_dragCenter;
+    m_dragStartScale = item->scale();
+    m_dragStartDistance = qMax(1.0, QLineF(m_dragCenter, scenePos).length());
+    m_dragStartRotation = item->rotation();
+    m_dragStartAngle = qRadiansToDegrees(qAtan2(fromCenter.y(), fromCenter.x()));
+}
+
+void BookCanvasView::updateHandleDrag(const QPointF &scenePos, Qt::KeyboardModifiers modifiers) {
+    QGraphicsItem *item = m_handleItem;
+    if (!item) return;
+
+    if (m_handleDrag == HandleDrag::Resize) {
+        if (auto *text = dynamic_cast<StoryTextItem*>(item)) {
+            // Text boxes get wider or narrower; the font size stays put.
+            const QPointF local = text->mapFromScene(scenePos);
+            text->setTextWidth(qMax(60.0, local.x() - text->boundingRect().left()));
+        } else {
+            const qreal ratio = QLineF(m_dragCenter, scenePos).length() / m_dragStartDistance;
+            item->setScale(qBound(0.03, m_dragStartScale * ratio, 40.0));
+        }
+    } else if (m_handleDrag == HandleDrag::Rotate) {
+        const QPointF fromCenter = scenePos - m_dragCenter;
+        const qreal angle = qRadiansToDegrees(qAtan2(fromCenter.y(), fromCenter.x()));
+        qreal rotation = m_dragStartRotation + (angle - m_dragStartAngle);
+        if (modifiers & Qt::ShiftModifier) rotation = qRound(rotation / 15.0) * 15.0;
+        item->setRotation(rotation);
+    }
+    viewport()->update();
+}
+
+// ---------------------------------------------------------------------------
+// Pictures
+
+QRectF BookCanvasView::pageInnerRect(const QString &side) const {
+    return side == "left" ? QRectF(40, 40, 520, 570) : QRectF(640, 40, 520, 570);
+}
+
+QRectF BookCanvasView::artFrameFor(const QString &side, const QPointF *point) const {
+    QRectF best;
+    for (auto *item : m_scene->items()) {
+        if (!item->data(ItemRole::IsTemplate).toBool() || item->data(ItemRole::TemplateKind).toString() != "art") continue;
+        const QString itemSide = item->data(ItemRole::TemplateSide).toString();
+        const QRectF frame = item->sceneBoundingRect().adjusted(2, 2, -2, -2);
+        if (point) {
+            // A drop picks the frame it lands in.
+            if (frame.contains(*point)) return frame;
+            continue;
+        }
+        if (itemSide != side && itemSide != "spread") continue;
+        if (frame.width() * frame.height() > best.width() * best.height()) best = frame;
+    }
+    return best;
+}
+
+void BookCanvasView::fitItemInto(QGraphicsItem *item, const QRectF &frame, bool cover) {
+    const QRectF br = item->boundingRect();
+    if (br.isEmpty()) return;
+    const qreal sx = frame.width() / br.width();
+    const qreal sy = frame.height() / br.height();
+    item->setRotation(0);
+    item->setTransformOriginPoint(br.center());
+    item->setScale(cover ? qMax(sx, sy) : qMin(sx, sy));
+    item->setPos(frame.center() - br.center());
+}
+
+bool BookCanvasView::placeImage(const QString &assetId, const QPointF *dropPos) {
+    if (assetId.isEmpty()) return false;
+
+    const QString side = dropPos ? (dropPos->x() < 600 ? "left" : "right") : m_activeSide;
+    QRectF frame = artFrameFor(side, dropPos);
+    if (!frame.isValid()) frame = pageInnerRect(side);
+
+    auto *image = new ImageItem(assetId);
+    fitItemInto(image, frame, false);
+    image->setZValue(nextTopZ());
+    m_scene->addItem(image);
+    adoptItem(image);
+
+    m_scene->clearSelection();
+    if (image->flags() & QGraphicsItem::ItemIsSelectable) image->setSelected(true);
+    emit selectionChanged(image);
+    recordChange("Add picture");
+    return true;
+}
+
+bool BookCanvasView::importImageFile(const QString &path, QString *error) {
+    return placeImage(AssetStore::addImageFile(path, error), nullptr);
+}
+
+bool BookCanvasView::importImage(const QImage &image) {
+    return placeImage(AssetStore::addImage(image), nullptr);
+}
+
+bool BookCanvasView::pasteFromMime(const QMimeData *mime, const QPointF *dropPos) {
+    if (!mime) return false;
+    bool placedAny = false;
+    if (mime->hasUrls()) {
+        for (const QUrl &url : mime->urls()) {
+            if (url.isLocalFile() && AssetStore::isImageFile(url.toLocalFile())) {
+                placedAny |= placeImage(AssetStore::addImageFile(url.toLocalFile()), dropPos);
+            }
+        }
+    }
+    if (!placedAny && mime->hasImage()) {
+        placedAny = placeImage(AssetStore::addImage(qvariant_cast<QImage>(mime->imageData())), dropPos);
+    }
+    return placedAny;
+}
+
+static bool mimeHasPicture(const QMimeData *mime) {
+    if (mime->hasImage()) return true;
+    for (const QUrl &url : mime->urls()) {
+        if (url.isLocalFile() && AssetStore::isImageFile(url.toLocalFile())) return true;
+    }
+    return false;
+}
+
+void BookCanvasView::dragEnterEvent(QDragEnterEvent *event) {
+    if (mimeHasPicture(event->mimeData())) event->acceptProposedAction();
+    else QGraphicsView::dragEnterEvent(event);
+}
+
+void BookCanvasView::dragMoveEvent(QDragMoveEvent *event) {
+    if (mimeHasPicture(event->mimeData())) event->acceptProposedAction();
+    else QGraphicsView::dragMoveEvent(event);
+}
+
+void BookCanvasView::dropEvent(QDropEvent *event) {
+    if (!mimeHasPicture(event->mimeData())) {
+        QGraphicsView::dropEvent(event);
+        return;
+    }
+    const QPointF scenePos = viewportToScene(event->position());
+    updateActiveSide(scenePos);
+    if (pasteFromMime(event->mimeData(), &scenePos)) event->acceptProposedAction();
 }
 
 // ---------------------------------------------------------------------------
@@ -707,6 +973,12 @@ void BookCanvasView::keyPressEvent(QKeyEvent *event) {
         return;
     }
 
+    if (event->matches(QKeySequence::Paste)) {
+        pasteFromMime(QGuiApplication::clipboard()->mimeData(), nullptr);
+        event->accept();
+        return;
+    }
+
     if ((event->key() == Qt::Key_Delete || event->key() == Qt::Key_Backspace) && !m_scene->selectedItems().isEmpty()) {
         deleteSelectedItem();
         event->accept();
@@ -746,6 +1018,15 @@ void BookCanvasView::mousePressEvent(QMouseEvent *event) {
 
     QPointF scenePos = viewportToScene(event->position());
     updateActiveSide(scenePos);
+
+    if (event->button() == Qt::LeftButton && m_mode == CanvasMode::Select) {
+        const HandleDrag drag = handleAt(event->position());
+        if (drag != HandleDrag::None) {
+            beginHandleDrag(drag, scenePos);
+            event->accept();
+            return;
+        }
+    }
 
     if (event->button() == Qt::RightButton) {
         QGraphicsItem *item = m_scene->itemAt(scenePos, transform());
@@ -799,6 +1080,19 @@ void BookCanvasView::mouseMoveEvent(QMouseEvent *event) {
         return;
     }
 
+    if (m_handleDrag != HandleDrag::None) {
+        updateHandleDrag(viewportToScene(event->position()), event->modifiers());
+        event->accept();
+        return;
+    }
+
+    if (m_mode == CanvasMode::Select && event->buttons() == Qt::NoButton) {
+        const HandleDrag hover = handleAt(event->position());
+        if (hover == HandleDrag::Resize) viewport()->setCursor(Qt::SizeFDiagCursor);
+        else if (hover == HandleDrag::Rotate) viewport()->setCursor(Qt::CrossCursor);
+        else updateCursor();
+    }
+
     QGraphicsView::mouseMoveEvent(event);
 }
 
@@ -824,6 +1118,15 @@ void BookCanvasView::mouseReleaseEvent(QMouseEvent *event) {
 
     if (m_mode == CanvasMode::Draw && event->button() == Qt::LeftButton && m_isDrawing) {
         endStroke();
+        event->accept();
+        return;
+    }
+
+    if (m_handleDrag != HandleDrag::None && event->button() == Qt::LeftButton) {
+        const bool rotated = m_handleDrag == HandleDrag::Rotate;
+        m_handleDrag = HandleDrag::None;
+        m_handleItem = nullptr;
+        recordChange(rotated ? "Rotate" : "Resize");
         event->accept();
         return;
     }
@@ -867,6 +1170,25 @@ void BookCanvasView::showContextMenu(const QPoint &globalPos, QGraphicsItem *ite
         if (auto *text = dynamic_cast<StoryTextItem*>(item)) {
             actEdit = menu.addAction("Edit Text");
             connect(actEdit, &QAction::triggered, [text]() { text->beginEditing(); });
+            menu.addSeparator();
+        }
+        if (item->type() == ImageItem::Type) {
+            const QString side = item->sceneBoundingRect().center().x() < 600 ? "left" : "right";
+            QAction *actFit = menu.addAction("Fit Inside Page");
+            QAction *actFill = menu.addAction("Fill Whole Page (Full Bleed)");
+            QAction *actSpread = menu.addAction("Fill Both Pages");
+            connect(actFit, &QAction::triggered, [this, item, side]() {
+                fitItemInto(item, pageInnerRect(side), false);
+                recordChange("Fit picture");
+            });
+            connect(actFill, &QAction::triggered, [this, item, side]() {
+                fitItemInto(item, side == "left" ? QRectF(0, 0, 600, 650) : QRectF(600, 0, 600, 650), true);
+                recordChange("Fill page");
+            });
+            connect(actSpread, &QAction::triggered, [this, item]() {
+                fitItemInto(item, QRectF(0, 0, 1200, 650), true);
+                recordChange("Fill spread");
+            });
             menu.addSeparator();
         }
         QAction *actDup = menu.addAction("Duplicate");
@@ -1009,6 +1331,7 @@ void BookCanvasView::addStoryShape(const QString &shapeType, const QColor &fill,
 
     if (item) {
         item->setZValue(nextTopZ());
+        centerTransformOrigin(item);
         adoptItem(item);
         m_scene->clearSelection();
         if (item->flags() & QGraphicsItem::ItemIsSelectable) item->setSelected(true);
@@ -1028,18 +1351,22 @@ void BookCanvasView::addStorySticker(const QString &stickerId, const QString &sv
         "</svg>"
     ).arg(svgPath, fill.name());
 
+    // Rendered at 4x and shown at quarter scale so stamps stay crisp in print.
     QSvgRenderer renderer(fullSvg.toUtf8());
-    QImage image(100, 100, QImage::Format_ARGB32_Premultiplied);
+    QImage image(400, 400, QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);
 
     QPainter painter(&image);
+    painter.setRenderHint(QPainter::Antialiasing, true);
     renderer.render(&painter);
     painter.end();
 
-    auto *pixmapItem = m_scene->addPixmap(QPixmap::fromImage(image));
-    pixmapItem->setTransformationMode(Qt::SmoothTransformation);
-    pixmapItem->setPos(posX, posY);
+    auto *pixmapItem = new ImageItem(AssetStore::addImage(image));
+    centerTransformOrigin(pixmapItem);
+    pixmapItem->setScale(0.25);
+    pixmapItem->setPos(QPointF(posX + 50, posY + 50) - pixmapItem->boundingRect().center());
     pixmapItem->setZValue(nextTopZ());
+    m_scene->addItem(pixmapItem);
     adoptItem(pixmapItem);
 
     m_scene->clearSelection();
@@ -1052,17 +1379,22 @@ void BookCanvasView::applyPageTemplate(const QString &side, const QString &templ
     qreal pageLeft = (side == "left") ? 60.0 : 660.0;
     qreal pageWidth = 480.0;
     qreal pageCenter = (side == "left") ? 300.0 : 900.0;
+    const bool wholeSpread = templateType == "spread_art";
 
+    // A layout replaces the frames on its page, and any frame spanning both pages.
     for (auto *item : m_scene->items()) {
-        if (item->data(ItemRole::TemplateSide).toString() == side && item->data(ItemRole::IsTemplate).toBool()) {
+        if (!item->data(ItemRole::IsTemplate).toBool()) continue;
+        const QString itemSide = item->data(ItemRole::TemplateSide).toString();
+        if (wholeSpread || itemSide == side || itemSide == "spread") {
             m_scene->removeItem(item);
             delete item;
         }
     }
 
-    auto registerTemplateItem = [this, side](QGraphicsItem *item) {
-        item->setData(ItemRole::TemplateSide, side);
+    auto registerTemplateItem = [this](QGraphicsItem *item, const QString &itemSide, const QString &kind) {
+        item->setData(ItemRole::TemplateSide, itemSide);
         item->setData(ItemRole::IsTemplate, true);
+        item->setData(ItemRole::TemplateKind, kind);
         item->setZValue(kTemplateZ);
         adoptItem(item);
     };
@@ -1072,31 +1404,33 @@ void BookCanvasView::applyPageTemplate(const QString &side, const QString &templ
     QBrush cardBrush(QColor(255, 255, 255, 220));
 
     if (templateType == "top_art_bottom_text") {
-        auto *top = m_scene->addRect(pageLeft, 50, pageWidth, 320, borderPen, artBrush);
-        auto *bottom = m_scene->addRect(pageLeft, 390, pageWidth, 210, borderPen, cardBrush);
-        registerTemplateItem(top);
-        registerTemplateItem(bottom);
+        registerTemplateItem(m_scene->addRect(pageLeft, 50, pageWidth, 320, borderPen, artBrush), side, "art");
+        registerTemplateItem(m_scene->addRect(pageLeft, 390, pageWidth, 210, borderPen, cardBrush), side, "text");
     } else if (templateType == "bottom_art_top_text") {
-        auto *top = m_scene->addRect(pageLeft, 50, pageWidth, 210, borderPen, cardBrush);
-        auto *bottom = m_scene->addRect(pageLeft, 280, pageWidth, 320, borderPen, artBrush);
-        registerTemplateItem(top);
-        registerTemplateItem(bottom);
+        registerTemplateItem(m_scene->addRect(pageLeft, 50, pageWidth, 210, borderPen, cardBrush), side, "text");
+        registerTemplateItem(m_scene->addRect(pageLeft, 280, pageWidth, 320, borderPen, artBrush), side, "art");
+    } else if (templateType == "big_art_caption") {
+        registerTemplateItem(m_scene->addRect(pageLeft, 50, pageWidth, 440, borderPen, artBrush), side, "art");
+        registerTemplateItem(m_scene->addRect(pageLeft, 505, pageWidth, 95, borderPen, cardBrush), side, "text");
+    } else if (templateType == "full_page_art") {
+        registerTemplateItem(m_scene->addRect(pageLeft - 36, 24, pageWidth + 72, 602, borderPen, artBrush), side, "art");
+    } else if (templateType == "text_page") {
+        registerTemplateItem(m_scene->addRect(pageLeft, 110, pageWidth, 430, borderPen, cardBrush), side, "text");
+    } else if (templateType == "spread_art") {
+        registerTemplateItem(m_scene->addRect(24, 24, 1152, 602, borderPen, artBrush), "spread", "art");
+    } else if (templateType == "classic_arch_story") {
+        QPen dashedAccent(m_theme.accentColor, 2, Qt::DashLine);
+        registerTemplateItem(m_scene->addRect(pageLeft - 10, 40, pageWidth + 20, 570, dashedAccent, Qt::NoBrush), side, "");
     } else if (templateType == "storyboard_panels") {
-        auto *p1 = m_scene->addRect(pageLeft, 50, pageWidth, 260, borderPen, artBrush);
-        auto *p2 = m_scene->addRect(pageLeft, 340, pageWidth, 260, borderPen, artBrush);
-        registerTemplateItem(p1);
-        registerTemplateItem(p2);
+        registerTemplateItem(m_scene->addRect(pageLeft, 50, pageWidth, 260, borderPen, artBrush), side, "art");
+        registerTemplateItem(m_scene->addRect(pageLeft, 340, pageWidth, 260, borderPen, artBrush), side, "art");
     } else if (templateType == "spot_rhyme") {
         QPen dashedAccent(m_theme.accentColor, 2, Qt::DashLine);
-        auto *circle = m_scene->addEllipse(pageCenter - 110, 60, 220, 220, dashedAccent, artBrush);
-        auto *card = m_scene->addRect(pageLeft + 20, 330, pageWidth - 40, 270, borderPen, cardBrush);
-        registerTemplateItem(circle);
-        registerTemplateItem(card);
+        registerTemplateItem(m_scene->addEllipse(pageCenter - 110, 60, 220, 220, dashedAccent, artBrush), side, "art");
+        registerTemplateItem(m_scene->addRect(pageLeft + 20, 330, pageWidth - 40, 270, borderPen, cardBrush), side, "text");
     } else if (templateType == "split_vertical") {
-        auto *c1 = m_scene->addRect(pageLeft, 50, 230, 550, borderPen, artBrush);
-        auto *c2 = m_scene->addRect(pageLeft + 250, 50, 230, 550, borderPen, cardBrush);
-        registerTemplateItem(c1);
-        registerTemplateItem(c2);
+        registerTemplateItem(m_scene->addRect(pageLeft, 50, 230, 550, borderPen, artBrush), side, "art");
+        registerTemplateItem(m_scene->addRect(pageLeft + 250, 50, 230, 550, borderPen, cardBrush), side, "text");
     }
 
     recordChange("Page layout");

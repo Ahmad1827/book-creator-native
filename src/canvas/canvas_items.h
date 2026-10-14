@@ -2,6 +2,7 @@
 
 #include <QGraphicsPathItem>
 #include <QGraphicsTextItem>
+#include <QGraphicsPixmapItem>
 #include <QGraphicsScene>
 #include <QJsonObject>
 #include <QVector>
@@ -12,6 +13,7 @@ namespace ItemRole {
     constexpr int IsTemplate = 1;
     constexpr int Id = 2;
     constexpr int Locked = 3;
+    constexpr int TemplateKind = 4;  // "art" or "text" frame of a page layout
 }
 
 struct StrokeSample {
@@ -81,6 +83,20 @@ signals:
 
 protected:
     void focusOutEvent(QFocusEvent *event) override;
+};
+
+// A picture from the AssetStore (imported artwork or a sticker).
+class ImageItem : public QGraphicsPixmapItem {
+public:
+    enum { Type = UserType + 3 };
+
+    explicit ImageItem(const QString &assetId);
+
+    int type() const override { return Type; }
+    QString assetId() const { return m_assetId; }
+
+private:
+    QString m_assetId;
 };
 
 namespace CanvasSerializer {

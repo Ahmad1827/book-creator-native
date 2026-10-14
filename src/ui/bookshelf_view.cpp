@@ -1,4 +1,5 @@
 #include "bookshelf_view.h"
+#include "spread_renderer.h"
 
 BookshelfView::BookshelfView(QWidget *parent)
     : QWidget(parent) {
@@ -177,6 +178,14 @@ void BookshelfView::refreshGrid() {
         spine->setStyleSheet(QString("background: %1; border-top-left-radius: 9px; border-bottom-left-radius: 9px; border: none;").arg(theme.spineColor.name()));
         cardLayout->addWidget(spine);
 
+        if (proj.hasCover()) {
+            QLabel *coverThumb = new QLabel(card);
+            const BookSpread &cover = proj.spreads.first();
+            coverThumb->setPixmap(SpreadRenderer::thumbnail(theme, cover, SpreadRenderer::rightPageRect(), 104, false));
+            coverThumb->setStyleSheet("border: 1px solid #dcc6ab; border-radius: 0; background: transparent;");
+            cardLayout->addWidget(coverThumb, 0, Qt::AlignVCenter);
+        }
+
         QVBoxLayout *body = new QVBoxLayout();
         body->setContentsMargins(0, 12, 0, 12);
         body->setSpacing(4);
@@ -205,7 +214,7 @@ void BookshelfView::refreshGrid() {
         QHBoxLayout *footer = new QHBoxLayout();
         footer->setSpacing(5);
 
-        QLabel *lblPages = new QLabel(QString("%1 pages").arg(proj.spreads.size() * 2), card);
+        QLabel *lblPages = new QLabel(QString("%1 pages").arg(proj.pageCount()), card);
         lblPages->setStyleSheet("font-size: 10px; font-weight: bold; color: #8b6d5c; border: none;");
         footer->addWidget(lblPages);
         footer->addStretch();

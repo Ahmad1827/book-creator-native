@@ -8,6 +8,8 @@
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QTabletEvent>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QMenu>
 #include <QAction>
 #include <QPointF>
@@ -49,6 +51,11 @@ public:
     void addStoryShape(const QString &shapeType, const QColor &fill, const QColor &stroke, qreal strokeWidth);
     void addStorySticker(const QString &stickerId, const QString &svgPath, const QColor &fill);
 
+    // Pictures are fitted into the page layout's picture frame, or the page if there is none.
+    bool importImageFile(const QString &path, QString *error = nullptr);
+    bool importImage(const QImage &image);
+    void setPageNumbers(int leftNum, int rightNum);
+
     void duplicateSelectedItem();
     void deleteSelectedItem();
     void bringSelectedItemToFront();
@@ -78,6 +85,10 @@ protected:
     bool viewportEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
+    void drawForeground(QPainter *painter, const QRectF &rect) override;
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    void dropEvent(QDropEvent *event) override;
     void wheelEvent(QWheelEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -102,6 +113,27 @@ private:
     void finishTextEditing();
     void onTextEditingFinished(StoryTextItem *item);
     QList<StoryTextItem*> selectedTextItems() const;
+
+    enum class HandleDrag { None, Resize, Rotate };
+    struct HandleGeometry {
+        QPolygonF outline;
+        QPointF center;
+        QPointF resize;
+        QPointF rotateBase;
+        QPointF rotate;
+    };
+    QGraphicsItem *handleTarget() const;
+    HandleGeometry handleGeometry(QGraphicsItem *item) const;
+    HandleDrag handleAt(const QPointF &viewportPos) const;
+    void beginHandleDrag(HandleDrag drag, const QPointF &scenePos);
+    void updateHandleDrag(const QPointF &scenePos, Qt::KeyboardModifiers modifiers);
+
+    bool placeImage(const QString &assetId, const QPointF *dropPos);
+    bool pasteFromMime(const QMimeData *mime, const QPointF *dropPos);
+    QRectF artFrameFor(const QString &side, const QPointF *point) const;
+    QRectF pageInnerRect(const QString &side) const;
+    void fitItemInto(QGraphicsItem *item, const QRectF &frame, bool cover);
+    static void centerTransformOrigin(QGraphicsItem *item);
 
     void adoptItem(QGraphicsItem *item);
     void applyInteractionFlags(QGraphicsItem *item);
@@ -145,6 +177,17 @@ private:
     bool m_spacePressed = false;
     QPoint m_lastPanPoint;
     bool m_initialFitDone = false;
+
+    int m_leftPageNum = 0;
+    int m_rightPageNum = 0;
+
+    HandleDrag m_handleDrag = HandleDrag::None;
+    QGraphicsItem *m_handleItem = nullptr;
+    QPointF m_dragCenter;
+    qreal m_dragStartScale = 1.0;
+    qreal m_dragStartDistance = 1.0;
+    qreal m_dragStartRotation = 0.0;
+    qreal m_dragStartAngle = 0.0;
 
     QUndoGroup *m_undoGroup;
     QHash<QString, QUndoStack*> m_undoStacks;

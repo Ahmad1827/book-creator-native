@@ -91,3 +91,15 @@ void ThemeDecors::draw(QPainter *painter, const BookTheme &theme) {
     renderCorner("tr", 1151, 49, true, false);
     renderCorner("br", 1151, 601, true, true);
 }
+void ThemeDecors::drawPageNumbers(QPainter *painter, const BookTheme &theme, int leftNum, int rightNum) {
+    painter->save();
+    QFont font(theme.recommendedFont);
+    font.setPixelSize(16);
+    painter->setFont(font);
+    QColor ink = theme.inkColor;
+    ink.setAlpha(170);
+    painter->setPen(ink);
+    if (leftNum > 0) painter->drawText(QRectF(250, 606, 100, 24), Qt::AlignCenter, QString::number(leftNum));
+    if (rightNum > 0) painter->drawText(QRectF(850, 606, 100, 24), Qt::AlignCenter, QString::number(rightNum));
+    painter->restore();
+}

@@ -38,15 +38,30 @@ struct CanvasLayer {
 
 struct BookSpread {
     QString id;
+    QString kind;  // "cover" for the back/front cover spread, empty for story pages
     int leftPageNum = 1;
     int rightPageNum = 2;
     QJsonObject canvasData;
     QList<CanvasLayer> layers;
     QString activeLayerId;
 
+    bool isCover() const { return kind == "cover"; }
+
+    static BookSpread blank(const QString &spreadId) {
+        BookSpread spread;
+        spread.id = spreadId;
+        spread.activeLayerId = "layer-1";
+        CanvasLayer layer;
+        layer.id = "layer-1";
+        layer.name = "Artwork Layer";
+        spread.layers.append(layer);
+        return spread;
+    }
+
     QJsonObject toJson() const {
         QJsonObject obj;
         obj["id"] = id;
+        if (!kind.isEmpty()) obj["kind"] = kind;
         obj["leftPageNum"] = leftPageNum;
         obj["rightPageNum"] = rightPageNum;
         obj["canvasData"] = canvasData;
@@ -64,6 +79,7 @@ struct BookSpread {
     static BookSpread fromJson(const QJsonObject &obj) {
         BookSpread spread;
         spread.id = obj["id"].toString();
+        spread.kind = obj["kind"].toString();
         spread.leftPageNum = obj["leftPageNum"].toInt(1);
         spread.rightPageNum = obj["rightPageNum"].toInt(2);
         spread.canvasData = obj["canvasData"].toObject();
@@ -153,6 +169,32 @@ struct BookProject {
     QString themeId;
     QList<BookSpread> spreads;
     QString createdAt;
+    bool showPageNumbers = true;
+
+    bool hasCover() const { return !spreads.isEmpty() && spreads.first().isCover(); }
+
+    int pageCount() const {
+        int count = 0;
+        for (const auto &s : spreads) {
+            if (!s.isCover()) count += 2;
+        }
+        return count;
+    }
+
+    // Story pages are numbered from 1 after the cover, in spread order.
+    void renumberPages() {
+        int next = 1;
+        for (auto &s : spreads) {
+            if (s.isCover()) {
+                s.leftPageNum = 0;
+                s.rightPageNum = 0;
+                continue;
+            }
+            s.leftPageNum = next;
+            s.rightPageNum = next + 1;
+            next += 2;
+        }
+    }
 
     QJsonObject toJson() const {
         QJsonObject obj;
@@ -161,6 +203,7 @@ struct BookProject {
         obj["author"] = author;
         obj["themeId"] = themeId;
         obj["createdAt"] = createdAt;
+        obj["showPageNumbers"] = showPageNumbers;
 
         QJsonArray spreadsArr;
         for (const auto &spread : spreads) {
@@ -178,6 +221,7 @@ struct BookProject {
         project.author = obj["author"].toString();
         project.themeId = obj["themeId"].toString("botanical_meadow");
         project.createdAt = obj["createdAt"].toString();
+        project.showPageNumbers = obj["showPageNumbers"].toBool(true);
 
         QJsonArray spreadsArr = obj["spreads"].toArray();
         for (const auto &val : spreadsArr) {

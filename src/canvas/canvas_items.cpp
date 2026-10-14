@@ -1,4 +1,6 @@
 #include "canvas_items.h"
+#include "asset_store.h"
+#include <QPainter>
 #include <QGraphicsRectItem>
 #include <QGraphicsEllipseItem>
 #include <QGraphicsPixmapItem>
@@ -6,7 +8,6 @@
 #include <QTextCursor>
 #include <QFocusEvent>
 #include <QJsonArray>
-#include <QBuffer>
 #include <QUuid>
 #include <QPen>
 #include <QtMath>
@@ -288,6 +289,25 @@ void StoryTextItem::focusOutEvent(QFocusEvent *event) {
 }
 
 // ---------------------------------------------------------------------------
+// ImageItem
+
+ImageItem::ImageItem(const QString &assetId)
+    : m_assetId(assetId) {
+    QPixmap pix = AssetStore::pixmap(assetId);
+    if (pix.isNull()) {
+        // Keep the slot visible so a missing file can be noticed and replaced.
+        pix = QPixmap(240, 160);
+        pix.fill(QColor("#e8e1d6"));
+        QPainter painter(&pix);
+        painter.setPen(QPen(QColor("#8b6d5c"), 2, Qt::DashLine));
+        painter.drawRect(pix.rect().adjusted(1, 1, -2, -2));
+        painter.drawText(pix.rect(), Qt::AlignCenter, "Missing picture");
+    }
+    setPixmap(pix);
+    setTransformationMode(Qt::SmoothTransformation);
+}
+
+// ---------------------------------------------------------------------------
 // CanvasSerializer
 
 QString CanvasSerializer::newId() {
@@ -326,6 +346,9 @@ QJsonObject CanvasSerializer::itemToJson(const QGraphicsItem *item) {
         obj["color"] = text->defaultTextColor().name(QColor::HexArgb);
         obj["align"] = alignmentToString(text->alignment());
         obj["width"] = text->textWidth();
+    } else if (auto *image = dynamic_cast<const ImageItem*>(item)) {
+        obj["type"] = "image";
+        obj["asset"] = image->assetId();
     } else if (auto *pathItem = dynamic_cast<const QGraphicsPathItem*>(item)) {
         obj["type"] = "path";
         obj["path"] = pathToJson(pathItem->path());
@@ -342,13 +365,6 @@ QJsonObject CanvasSerializer::itemToJson(const QGraphicsItem *item) {
         obj["rect"] = rectToJson(ellipseItem->rect());
         obj["pen"] = penToJson(ellipseItem->pen());
         obj["fill"] = brushToJson(ellipseItem->brush());
-    } else if (auto *pixItem = dynamic_cast<const QGraphicsPixmapItem*>(item)) {
-        QByteArray png;
-        QBuffer buffer(&png);
-        buffer.open(QIODevice::WriteOnly);
-        pixItem->pixmap().save(&buffer, "PNG");
-        obj["type"] = "image";
-        obj["png"] = QString::fromLatin1(png.toBase64());
     } else {
         return {};
     }
@@ -358,12 +374,21 @@ QJsonObject CanvasSerializer::itemToJson(const QGraphicsItem *item) {
     obj["y"] = round2(item->pos().y());
     obj["z"] = item->zValue();
     if (item->opacity() < 1.0) obj["opacity"] = item->opacity();
+    if (!qFuzzyCompare(item->scale(), 1.0)) obj["scale"] = item->scale();
+    if (!qFuzzyIsNull(item->rotation())) obj["rotation"] = round2(item->rotation());
+    if (!item->transformOriginPoint().isNull()) {
+        obj["origin"] = QJsonArray{round2(item->transformOriginPoint().x()), round2(item->transformOriginPoint().y())};
+    }
     if (!item->transform().isIdentity()) {
         const QTransform t = item->transform();
         obj["transform"] = QJsonArray{t.m11(), t.m12(), t.m13(), t.m21(), t.m22(), t.m23(), t.m31(), t.m32(), t.m33()};
     }
     if (item->data(ItemRole::Locked).toBool()) obj["locked"] = true;
-    if (item->data(ItemRole::IsTemplate).toBool()) obj["template"] = item->data(ItemRole::TemplateSide).toString();
+    if (item->data(ItemRole::IsTemplate).toBool()) {
+        obj["template"] = item->data(ItemRole::TemplateSide).toString();
+        const QString kind = item->data(ItemRole::TemplateKind).toString();
+        if (!kind.isEmpty()) obj["templateKind"] = kind;
+    }
 
     return obj;
 }
@@ -406,11 +431,14 @@ QGraphicsItem *CanvasSerializer::itemFromJson(const QJsonObject &obj) {
         ellipseItem->setBrush(brushFromJson(obj["fill"]));
         item = ellipseItem;
     } else if (type == "image") {
-        QPixmap pix;
-        pix.loadFromData(QByteArray::fromBase64(obj["png"].toString().toLatin1()), "PNG");
-        auto *pixItem = new QGraphicsPixmapItem(pix);
-        pixItem->setTransformationMode(Qt::SmoothTransformation);
-        item = pixItem;
+        QString assetId = obj["asset"].toString();
+        if (assetId.isEmpty() && obj.contains("png")) {
+            // Phase 1 kept sticker pixels inline; move them into the asset store.
+            QImage legacy;
+            legacy.loadFromData(QByteArray::fromBase64(obj["png"].toString().toLatin1()), "PNG");
+            assetId = AssetStore::addImage(legacy);
+        }
+        item = new ImageItem(assetId);
     } else {
         return nullptr;
     }
@@ -418,6 +446,10 @@ QGraphicsItem *CanvasSerializer::itemFromJson(const QJsonObject &obj) {
     item->setPos(obj["x"].toDouble(), obj["y"].toDouble());
     item->setZValue(obj["z"].toDouble());
     item->setOpacity(obj["opacity"].toDouble(1.0));
+    const QJsonArray origin = obj["origin"].toArray();
+    if (origin.size() == 2) item->setTransformOriginPoint(origin[0].toDouble(), origin[1].toDouble());
+    item->setScale(obj["scale"].toDouble(1.0));
+    item->setRotation(obj["rotation"].toDouble(0.0));
     const QJsonArray t = obj["transform"].toArray();
     if (t.size() == 9) {
         item->setTransform(QTransform(t[0].toDouble(), t[1].toDouble(), t[2].toDouble(),
@@ -429,6 +461,7 @@ QGraphicsItem *CanvasSerializer::itemFromJson(const QJsonObject &obj) {
     if (obj.contains("template")) {
         item->setData(ItemRole::IsTemplate, true);
         item->setData(ItemRole::TemplateSide, obj["template"].toString());
+        item->setData(ItemRole::TemplateKind, obj["templateKind"].toString());
     }
     ensureId(item);
 
